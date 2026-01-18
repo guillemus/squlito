@@ -2,7 +2,6 @@ import {
     createCliRenderer,
     type KeyEvent,
     type ScrollBoxRenderable,
-    type SelectOption,
     TextAttributes,
 } from '@opentui/core'
 import { createRoot, useKeyboard, useTerminalDimensions } from '@opentui/react'
@@ -350,31 +349,39 @@ function App(props: { dbPath: string; requestExit: () => void }) {
                 </text>
                 <box height={1} />
 
-                <select
+                <scrollbox
                     focused={sidebarFocused}
-                    options={useMemo((): SelectOption[] => {
-                        const options: SelectOption[] = []
-                        for (const t of tables) {
-                            options.push({ name: t.name, description: '', value: t.name })
-                        }
-                        return options
-                    }, [tables])}
-                    selectedIndex={selectedTableIndex}
-                    wrapSelection={true}
-                    showDescription={false}
-                    showScrollIndicator={true}
-                    style={{ flexGrow: 1 }}
-                    onChange={(index) => {
-                        setSelectedTableIndex(index)
-                    }}
-                    onSelect={() => {
-                        setFocusArea('sidebar')
-                    }}
-                />
+                    style={{ flexGrow: 1, scrollY: true }}
+                    viewportOptions={{ backgroundColor: '#0b1020' }}
+                >
+                    <box flexDirection="column" width="100%">
+                        {tables.map((table, index) => {
+                            const isSelected = index === selectedTableIndex
+                            const rowBackground = isSelected ? '#1e2b4f' : '#0b1020'
+                            const rowTextColor = isSelected ? '#d4defc' : '#cbd5f0'
+
+                            return (
+                                <box
+                                    key={table.name}
+                                    width="100%"
+                                    paddingLeft={1}
+                                    paddingRight={1}
+                                    backgroundColor={rowBackground}
+                                    onMouseDown={() => {
+                                        setSelectedTableIndex(index)
+                                        setFocusArea('sidebar')
+                                    }}
+                                >
+                                    <text fg={rowTextColor}>{table.name}</text>
+                                </box>
+                            )
+                        })}
+                    </box>
+                </scrollbox>
 
                 <box height={1} />
                 <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                    {'↑↓ select'}
+                    {'↑↓ select  click to focus'}
                 </text>
             </box>
 
