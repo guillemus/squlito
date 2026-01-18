@@ -73,7 +73,6 @@ export function getTableColumns(db: Database, tableName: string): SqliteColumn[]
 export type TablePage = {
     totalRows: number
     offset: number
-    limit: number
     rows: SqliteRow[]
 }
 
@@ -84,7 +83,7 @@ export function getTablePage(
     offset: number,
 ): TablePage {
     const safeLimit = clamp(limit, 1, 500)
-    let safeOffset = Math.max(0, offset)
+    const safeOffset = Math.max(0, offset)
 
     const countSql = `SELECT COUNT(*) AS count FROM ${quoteIdentifier(tableName)}`
     const countStmt = db.query<{ count: number }, []>(countSql)
@@ -92,16 +91,12 @@ export function getTablePage(
 
     const totalRows = countRow?.count ?? 0
 
-    if (totalRows > 0 && safeOffset >= totalRows) {
-        safeOffset = Math.max(0, totalRows - safeLimit)
-    }
-
     const pageSql = `SELECT * FROM ${quoteIdentifier(tableName)} LIMIT ? OFFSET ?`
     const pageStmt = db.query<SqliteRow, [number, number]>(pageSql)
 
     const rows = pageStmt.all(safeLimit, safeOffset)
 
-    return { totalRows, offset: safeOffset, limit: safeLimit, rows }
+    return { totalRows, offset: safeOffset, rows }
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -12,7 +12,6 @@ describe('computeTable', () => {
         const out = computeTable({
             columns: ['id', 'name', 'active', 'note'],
             rows,
-            maxWidth: 200,
         })
 
         expect(out.header).toContain('id')
@@ -22,7 +21,7 @@ describe('computeTable', () => {
         expect(out.body).toContain('NULL')
     })
 
-    test('truncates cells to fit maxWidth', () => {
+    test('returns width and rowCount metadata', () => {
         const rows: SqliteRow[] = [
             {
                 id: 1,
@@ -33,12 +32,9 @@ describe('computeTable', () => {
         const out = computeTable({
             columns: ['id', 'name'],
             rows,
-            maxWidth: 20,
         })
 
-        expect(out.header.length).toBeLessThanOrEqual(20)
-        const lines = out.body.split('\n')
-        expect(lines[0]?.length ?? 0).toBeLessThanOrEqual(20)
-        expect(out.body).toContain('...')
+        expect(out.width).toBeGreaterThan(0)
+        expect(out.rowCount).toBe(1)
     })
 })

@@ -76,7 +76,6 @@ describe('getTablePage', () => {
         const page = getTablePage(db, 'users', 3, 4)
         expect(page.totalRows).toBe(10)
         expect(page.offset).toBe(4)
-        expect(page.limit).toBe(3)
 
         const ids = page.rows.map((r) => r.id)
         expect(ids).toEqual([5, 6, 7])
@@ -84,7 +83,7 @@ describe('getTablePage', () => {
         db.close()
     })
 
-    test('clamps offset when it exceeds total rows', () => {
+    test('does not clamp offset when it exceeds total rows', () => {
         const db = createDb()
         db.exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)')
 
@@ -97,10 +96,10 @@ describe('getTablePage', () => {
 
         const page = getTablePage(db, 'users', 4, 999)
         expect(page.totalRows).toBe(10)
-        expect(page.offset).toBe(6)
+        expect(page.offset).toBe(999)
 
         const ids = page.rows.map((r) => r.id)
-        expect(ids).toEqual([7, 8, 9, 10])
+        expect(ids).toEqual([])
 
         db.close()
     })

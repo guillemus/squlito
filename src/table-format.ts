@@ -3,17 +3,17 @@ import type { SqliteRow } from './db'
 export type TableRender = {
     header: string
     body: string
+    width: number
+    rowCount: number
 }
 
 type ComputeTableConfig = {
     columns: string[]
     rows: SqliteRow[]
-    maxWidth: number
     maxRows?: number
 }
 
 export function computeTable(config: ComputeTableConfig): TableRender {
-    const safeMaxWidth = Math.max(20, config.maxWidth)
     const safeMaxRows = config.maxRows
 
     let visibleRows = config.rows
@@ -63,15 +63,6 @@ export function computeTable(config: ComputeTableConfig): TableRender {
     }
     totalWidth += totalSeparators * separatorWidth
 
-    if (totalWidth > safeMaxWidth) {
-        const available = safeMaxWidth - totalSeparators * separatorWidth
-        const perCol = Math.max(minColWidth, Math.floor(available / Math.max(1, widths.length)))
-
-        for (let i = 0; i < widths.length; i += 1) {
-            widths[i] = Math.min(widths[i] ?? perCol, perCol)
-        }
-    }
-
     const headerCells: string[] = []
     for (let i = 0; i < config.columns.length; i += 1) {
         const key = config.columns[i]
@@ -111,6 +102,8 @@ export function computeTable(config: ComputeTableConfig): TableRender {
     return {
         header,
         body: bodyLines.join('\n'),
+        width: totalWidth,
+        rowCount: visibleRows.length,
     }
 }
 

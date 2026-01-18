@@ -3,19 +3,12 @@ import { mkdir, rm } from 'node:fs/promises'
 
 type SeedConfig = {
     dbPath: string
-    reset: boolean
 }
 
 function parseSeedArgs(argv: string[]): SeedConfig {
     let dbPath = 'data/seed.db'
-    let reset = true
 
     for (const arg of argv) {
-        if (arg === '--no-reset') {
-            reset = false
-            continue
-        }
-
         if (arg.startsWith('--db=')) {
             dbPath = arg.slice('--db='.length)
             continue
@@ -26,7 +19,7 @@ function parseSeedArgs(argv: string[]): SeedConfig {
         }
     }
 
-    return { dbPath, reset }
+    return { dbPath }
 }
 
 type Customer = {
@@ -60,9 +53,7 @@ async function main(): Promise<void> {
 
     await mkdir('data', { recursive: true })
 
-    if (config.reset) {
-        await rm(config.dbPath, { force: true })
-    }
+    await rm(config.dbPath, { force: true })
 
     const db = new Database(config.dbPath)
 
@@ -117,31 +108,20 @@ async function main(): Promise<void> {
         return
     }
 
-    const customers: Customer[] = [
-        { name: 'Ava Chen', email: 'ava.chen@example.com' },
-        { name: 'Mateo Rivera', email: 'mateo.rivera@example.com' },
-        { name: 'Noah Patel', email: 'noah.patel@example.com' },
-        { name: 'Sofia Garcia', email: 'sofia.garcia@example.com' },
-        { name: 'Liam Nguyen', email: 'liam.nguyen@example.com' },
-        { name: 'Emma Johnson', email: 'emma.johnson@example.com' },
-        { name: 'Amir Ali', email: 'amir.ali@example.com' },
-        { name: 'Mia Rossi', email: 'mia.rossi@example.com' },
-    ]
+    const customers: Customer[] = []
+    for (let i = 1; i <= 500; i += 1) {
+        const name = `Customer ${i}`
+        const email = `customer.${i}@example.com`
+        customers.push({ name, email })
+    }
 
-    const products: Product[] = [
-        { sku: 'SKU-TEA-001', name: 'Jasmine Green Tea', priceCents: 1299 },
-        { sku: 'SKU-COF-001', name: 'Ethiopian Coffee Beans', priceCents: 1799 },
-        { sku: 'SKU-MUG-001', name: 'Ceramic Mug', priceCents: 1599 },
-        { sku: 'SKU-FLT-001', name: 'Reusable Filter', priceCents: 899 },
-        { sku: 'SKU-CHC-001', name: 'Dark Chocolate Bar', priceCents: 499 },
-        { sku: 'SKU-HNY-001', name: 'Wildflower Honey', priceCents: 1099 },
-        { sku: 'SKU-CRM-001', name: 'Oat Creamer', priceCents: 699 },
-        { sku: 'SKU-BIS-001', name: 'Butter Biscuits', priceCents: 549 },
-        { sku: 'SKU-SPN-001', name: 'Espresso Spoon Set', priceCents: 1899 },
-        { sku: 'SKU-KET-001', name: 'Mini Kettle', priceCents: 3499 },
-        { sku: 'SKU-BRW-001', name: 'Pour-over Brewer', priceCents: 2499 },
-        { sku: 'SKU-NAP-001', name: 'Linen Napkins', priceCents: 2199 },
-    ]
+    const products: Product[] = []
+    for (let i = 1; i <= 200; i += 1) {
+        const sku = `SKU-${String(i).padStart(4, '0')}`
+        const name = `Product ${i}`
+        const priceCents = 500 + (i % 50) * 75
+        products.push({ sku, name, priceCents })
+    }
 
     const insertCustomer = db.prepare<unknown, [string, string, string]>(
         'INSERT INTO customers (name, email, created_at) VALUES (?, ?, ?)',
@@ -181,7 +161,8 @@ async function main(): Promise<void> {
         customerIdByEmail.set(row.email, row.id)
     }
 
-    function getCustomerId(email: string): number {
+    function getCustomerId(index: number): number {
+        const email = `customer.${index}@example.com`
         const value = customerIdByEmail.get(email)
         if (value === undefined) {
             throw new Error(`Missing customer id for ${email}`)
@@ -189,7 +170,8 @@ async function main(): Promise<void> {
         return value
     }
 
-    function getProductId(sku: string): number {
+    function getProductId(index: number): number {
+        const sku = `SKU-${String(index).padStart(4, '0')}`
         const value = productIdBySku.get(sku)
         if (value === undefined) {
             throw new Error(`Missing product id for ${sku}`)
@@ -197,63 +179,33 @@ async function main(): Promise<void> {
         return value
     }
 
-    const orders: OrderSeed[] = [
-        {
-            customerId: getCustomerId('ava.chen@example.com'),
-            status: 'paid',
-            createdAt: isoDaysAgo(7),
-            items: [
-                { productId: getProductId('SKU-COF-001'), quantity: 1, unitPriceCents: 1799 },
-                { productId: getProductId('SKU-MUG-001'), quantity: 2, unitPriceCents: 1599 },
-            ],
-        },
-        {
-            customerId: getCustomerId('mateo.rivera@example.com'),
-            status: 'shipped',
-            createdAt: isoDaysAgo(3),
-            items: [
-                { productId: getProductId('SKU-TEA-001'), quantity: 3, unitPriceCents: 1299 },
-                { productId: getProductId('SKU-HNY-001'), quantity: 1, unitPriceCents: 1099 },
-            ],
-        },
-        {
-            customerId: getCustomerId('noah.patel@example.com'),
-            status: 'pending',
-            createdAt: isoDaysAgo(1),
-            items: [
-                { productId: getProductId('SKU-BRW-001'), quantity: 1, unitPriceCents: 2499 },
-                { productId: getProductId('SKU-FLT-001'), quantity: 2, unitPriceCents: 899 },
-                { productId: getProductId('SKU-CHC-001'), quantity: 4, unitPriceCents: 499 },
-            ],
-        },
-        {
-            customerId: getCustomerId('sofia.garcia@example.com'),
-            status: 'cancelled',
-            createdAt: isoDaysAgo(12),
-            items: [
-                { productId: getProductId('SKU-KET-001'), quantity: 1, unitPriceCents: 3499 },
-                { productId: getProductId('SKU-SPN-001'), quantity: 1, unitPriceCents: 1899 },
-            ],
-        },
-        {
-            customerId: getCustomerId('liam.nguyen@example.com'),
-            status: 'paid',
-            createdAt: isoDaysAgo(20),
-            items: [
-                { productId: getProductId('SKU-BIS-001'), quantity: 2, unitPriceCents: 549 },
-                { productId: getProductId('SKU-CRM-001'), quantity: 3, unitPriceCents: 699 },
-            ],
-        },
-        {
-            customerId: getCustomerId('emma.johnson@example.com'),
-            status: 'shipped',
-            createdAt: isoDaysAgo(16),
-            items: [
-                { productId: getProductId('SKU-NAP-001'), quantity: 1, unitPriceCents: 2199 },
-                { productId: getProductId('SKU-MUG-001'), quantity: 1, unitPriceCents: 1599 },
-            ],
-        },
-    ]
+    const orders: OrderSeed[] = []
+    for (let i = 1; i <= 5000; i += 1) {
+        const customerId = getCustomerId(((i - 1) % customers.length) + 1)
+        const statusOptions: OrderStatus[] = ['pending', 'paid', 'shipped', 'cancelled']
+        const status = statusOptions[i % statusOptions.length] ?? 'pending'
+        const createdAt = isoDaysAgo(i % 45)
+        const items: OrderSeed['items'] = []
+        const itemCount = 1 + (i % 4)
+
+        for (let j = 0; j < itemCount; j += 1) {
+            const productIndex = ((i + j) % products.length) + 1
+            const productId = getProductId(productIndex)
+            const quantity = 1 + ((i + j) % 3)
+            const product = products[productIndex - 1]
+            if (!product) {
+                continue
+            }
+
+            items.push({
+                productId,
+                quantity,
+                unitPriceCents: product.priceCents,
+            })
+        }
+
+        orders.push({ customerId, status, createdAt, items })
+    }
 
     const insertOrder = db.prepare<unknown, [number, string, string]>(
         'INSERT INTO orders (customer_id, status, created_at) VALUES (?, ?, ?)',

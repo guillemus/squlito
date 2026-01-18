@@ -6,7 +6,10 @@ import {
     TextAttributes,
 } from '@opentui/core'
 import { createRoot, useKeyboard, useTerminalDimensions } from '@opentui/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
+
+const BUFFER_SIZE = 200
+const SCROLL_STEP_DIVISOR = 5
 import {
     type SqliteRow,
     type SqliteTable,
@@ -24,7 +27,8 @@ type TableState = {
     name: string
     totalRows: number
     offset: number
-    limit: number
+    bufferStart: number
+    bufferSize: number
     rows: SqliteRow[]
     columns: string[]
     error: string | null
@@ -39,16 +43,82 @@ function App(props: { dbPath: string; requestExit: () => void }) {
     const [selectedTableIndex, setSelectedTableIndex] = useState(0)
 
     const rowsScrollRef = useRef<ScrollBoxRenderable>(null)
+    const headerScrollRef = useRef<ScrollBoxRenderable>(null)
 
     const [tableState, setTableState] = useState<TableState>({
         name: '',
         totalRows: 0,
         offset: 0,
-        limit: 25,
+        bufferStart: 0,
+        bufferSize: BUFFER_SIZE,
         rows: [],
         columns: [],
         error: null,
     })
+
+    const sidebarWidth = clamp(Math.floor(dims.width * 0.28), 22, 40)
+    const mainWidth = Math.max(20, dims.width - sidebarWidth)
+    const tableViewportWidth = Math.max(10, mainWidth - 4)
+    const tableViewportHeight = Math.max(3, dims.height - 8)
+
+    const tableView = useMemo(() => {
+        if (tableState.error) {
+            return {
+                header: '',
+                body: tableState.error,
+                width: 0,
+                rowCount: 0,
+            }
+        }
+
+        if (tableState.name.length === 0) {
+            return {
+                header: '',
+                body: 'No table selected',
+                width: 0,
+                rowCount: 0,
+            }
+        }
+
+        if (tableState.columns.length === 0) {
+            return {
+                header: '',
+                body: '(empty)',
+                width: 0,
+                rowCount: 0,
+            }
+        }
+
+        return computeTable({
+            columns: tableState.columns,
+            rows: tableState.rows,
+        })
+    }, [tableState.columns, tableState.error, tableState.name, tableState.rows])
+
+    const tableContentWidth = tableView.width + 2
+
+    const scrollState = useMemo((): ScrollState => {
+        const overflowY = tableView.rowCount > tableViewportHeight
+        const overflowX = tableContentWidth > tableViewportWidth
+
+        return {
+            overflowY,
+            overflowX,
+            viewportRows: tableViewportHeight,
+            viewportWidth: tableViewportWidth,
+            tableContentWidth,
+        }
+    }, [tableView.rowCount, tableContentWidth, tableViewportHeight, tableViewportWidth])
+
+    const sidebarFocused = focusArea === 'sidebar'
+    const rowsFocused = focusArea === 'rows'
+
+    const rowScrollDelta = tableState.offset - tableState.bufferStart
+    const showStart = tableState.totalRows === 0 ? 0 : tableState.offset + 1
+    let showEnd = tableState.offset + tableViewportHeight
+    if (tableState.totalRows > 0) {
+        showEnd = Math.min(tableState.totalRows, showEnd)
+    }
 
     useEffect(() => {
         const db = openDatabase(props.dbPath)
@@ -60,7 +130,7 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             if (nextTables.length > 0) {
                 const firstName = nextTables[0]?.name ?? ''
                 if (firstName.length > 0) {
-                    const page = getTablePage(db, firstName, 25, 0)
+                    const page = getTablePage(db, firstName, BUFFER_SIZE, 0)
 
                     const columns: string[] = []
                     for (const c of getTableColumns(db, firstName)) {
@@ -68,15 +138,16 @@ function App(props: { dbPath: string; requestExit: () => void }) {
                     }
 
                     setSelectedTableIndex(0)
-                    setTableState({
+                    setTableState((prev) => ({
+                        ...prev,
                         name: firstName,
                         totalRows: page.totalRows,
                         offset: page.offset,
-                        limit: page.limit,
+                        bufferStart: page.offset,
                         rows: page.rows,
                         columns,
                         error: null,
-                    })
+                    }))
                 }
             }
         } catch (err) {
@@ -101,6 +172,7 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             ...prev,
             name: selectedName,
             offset: 0,
+            bufferStart: 0,
             error: null,
         }))
 
@@ -114,31 +186,68 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             return
         }
 
+        setTableState((prev) => {
+            const maxOffset = Math.max(0, prev.totalRows - scrollState.viewportRows)
+            const nextOffset = clamp(prev.offset, 0, maxOffset)
+            let nextBufferStart = prev.bufferStart
+            const bufferEnd = nextBufferStart + prev.bufferSize
+
+            if (!scrollState.overflowY) {
+                nextBufferStart = 0
+            }
+
+            if (nextOffset < nextBufferStart) {
+                nextBufferStart = nextOffset
+            }
+
+            if (nextOffset >= bufferEnd) {
+                nextBufferStart = Math.max(0, nextOffset - prev.bufferSize + 1)
+            }
+
+            const shouldUpdateOffset = nextOffset !== prev.offset
+            const shouldUpdateBuffer = nextBufferStart !== prev.bufferStart
+
+            if (!shouldUpdateOffset && !shouldUpdateBuffer) {
+                return prev
+            }
+
+            return {
+                ...prev,
+                offset: nextOffset,
+                bufferStart: nextBufferStart,
+            }
+        })
+    }, [scrollState.viewportRows, tableState.name, tableState.totalRows])
+
+    useEffect(() => {
+        if (tableState.name.length === 0) {
+            return
+        }
+
         const db = openDatabase(props.dbPath)
 
         try {
-            const page = getTablePage(db, tableState.name, tableState.limit, tableState.offset)
+            const page = getTablePage(
+                db,
+                tableState.name,
+                tableState.bufferSize,
+                tableState.bufferStart,
+            )
 
             const columns: string[] = []
             for (const c of getTableColumns(db, tableState.name)) {
                 columns.push(c.name)
             }
 
+            const bufferStart = page.offset
             setTableState((prev) => ({
                 ...prev,
                 totalRows: page.totalRows,
-                offset: page.offset,
-                limit: page.limit,
+                bufferStart,
                 rows: page.rows,
                 columns,
                 error: null,
             }))
-
-            const rowIndexWithinPage = page.offset - tableState.offset
-            if (rowsScrollRef.current && rowIndexWithinPage !== 0) {
-                const nextScrollTop = Math.max(0, rowIndexWithinPage)
-                rowsScrollRef.current.scrollTop = nextScrollTop
-            }
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
             setTableState((prev) => ({
@@ -151,20 +260,52 @@ function App(props: { dbPath: string; requestExit: () => void }) {
         } finally {
             db.close()
         }
-    }, [props.dbPath, tableState.name, tableState.limit, tableState.offset])
+    }, [props.dbPath, tableState.name, tableState.bufferSize, tableState.bufferStart])
 
-    useKeyboard((key) => {
-        if (key.eventType === 'release') {
+    useEffect(() => {
+        if (!rowsScrollRef.current) {
             return
         }
 
-        if (key.name === 'h') {
-            setTableState((prev) => {
-                const nextError = prev.error ? null : cliHelp.trim()
-                return { ...prev, error: nextError }
-            })
-            key.preventDefault()
-            key.stopPropagation()
+        const scrollbox = rowsScrollRef.current
+
+        if (!scrollState.overflowY) {
+            scrollbox.scrollTop = 0
+        } else {
+            scrollbox.scrollTop = Math.max(0, rowScrollDelta)
+        }
+
+        if (!scrollState.overflowX) {
+            scrollbox.scrollLeft = 0
+        }
+
+        if (headerScrollRef.current) {
+            headerScrollRef.current.scrollLeft = scrollbox.scrollLeft
+        }
+    }, [rowScrollDelta, scrollState.overflowX, scrollState.overflowY, tableState.bufferStart])
+
+    useEffect(() => {
+        const scrollbox = rowsScrollRef.current
+        const headerBox = headerScrollRef.current
+        if (!scrollbox || !headerBox) {
+            return
+        }
+
+        const syncHeader = () => {
+            headerBox.scrollLeft = scrollbox.scrollLeft
+        }
+
+        scrollbox.onMouse = syncHeader
+        scrollbox.onKeyDown = syncHeader
+
+        return () => {
+            scrollbox.onMouse = undefined
+            scrollbox.onKeyDown = undefined
+        }
+    }, [])
+
+    useKeyboard((key) => {
+        if (key.eventType === 'release') {
             return
         }
 
@@ -176,6 +317,9 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             setSelectedTableIndex,
             tableState,
             setTableState,
+            scrollState,
+            rowsScrollRef,
+            headerScrollRef,
             requestExit: props.requestExit,
         })
 
@@ -184,57 +328,6 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             key.stopPropagation()
         }
     })
-
-    const sidebarWidth = clamp(Math.floor(dims.width * 0.28), 22, 40)
-    const mainWidth = Math.max(20, dims.width - sidebarWidth)
-
-    const tableView = useMemo(() => {
-        if (tableState.error) {
-            return {
-                header: '',
-                body: tableState.error,
-            }
-        }
-
-        if (tableState.name.length === 0) {
-            return {
-                header: '',
-                body: 'No table selected',
-            }
-        }
-
-        if (tableState.columns.length === 0) {
-            return {
-                header: '',
-                body: '(empty)',
-            }
-        }
-
-        return computeTable({
-            columns: tableState.columns,
-            rows: tableState.rows,
-            maxWidth: Math.max(20, mainWidth - 4),
-        })
-    }, [mainWidth, tableState.columns, tableState.error, tableState.name, tableState.rows])
-
-    const sidebarFocused = focusArea === 'sidebar'
-    const rowsFocused = focusArea === 'rows'
-
-    const pageEnd = Math.min(tableState.totalRows, tableState.offset + tableState.limit)
-    const showStart = tableState.totalRows === 0 ? 0 : tableState.offset + 1
-
-    const cliHelp = `
-usage:
-  bun run src/index.tsx [path/to/db]
-
-keys:
-  tab: switch focus
-  up/down or j/k: move
-  enter: focus rows
-  pgup/pgdn: page
-  left/right: limit
-  q/esc/ctrl+c: quit
-`
 
     return (
         <box flexDirection="row" width="100%" height="100%" backgroundColor="#0b1020">
@@ -275,13 +368,13 @@ keys:
                         setSelectedTableIndex(index)
                     }}
                     onSelect={() => {
-                        setFocusArea('rows')
+                        setFocusArea('sidebar')
                     }}
                 />
 
                 <box height={1} />
                 <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                    {'↑↓ select  Enter open'}
+                    {'↑↓ select'}
                 </text>
             </box>
 
@@ -298,7 +391,7 @@ keys:
             >
                 <box flexDirection="row" justifyContent="space-between" width="100%">
                     <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                        {`Rows ${tableState.totalRows}  Showing ${showStart}-${pageEnd}  Limit ${tableState.limit}`}
+                        {`Rows ${tableState.totalRows}  Showing ${showStart}-${showEnd}`}
                     </text>
                     <text attributes={TextAttributes.DIM} fg="#9aa4c5">
                         {rowsFocused ? '[Tab] tables' : '[Tab] rows'}
@@ -307,24 +400,30 @@ keys:
 
                 <box height={1} />
 
-                {tableView.header.length > 0 ? (
-                    <box
-                        backgroundColor="#121a33"
-                        paddingLeft={1}
-                        paddingRight={1}
-                        height={1}
-                        width="100%"
+                {tableView.header.length > 0 && (
+                    <scrollbox
+                        ref={headerScrollRef}
+                        focused={false}
+                        style={{ height: 1, scrollX: scrollState.overflowX }}
+                        viewportOptions={{ backgroundColor: '#121a33' }}
                     >
-                        <text fg="#d4defc" attributes={TextAttributes.BOLD}>
-                            {tableView.header}
-                        </text>
-                    </box>
-                ) : null}
+                        <box paddingLeft={1} paddingRight={1} height={1} width={tableContentWidth}>
+                            <text fg="#d4defc" attributes={TextAttributes.BOLD}>
+                                {tableView.header}
+                            </text>
+                        </box>
+                    </scrollbox>
+                )}
 
                 <scrollbox
                     ref={rowsScrollRef}
                     focused={rowsFocused}
-                    style={{ flexGrow: 1, scrollY: true, viewportCulling: true }}
+                    style={{
+                        flexGrow: 1,
+                        scrollY: scrollState.overflowY,
+                        scrollX: scrollState.overflowX,
+                        viewportCulling: true,
+                    }}
                     viewportOptions={{ backgroundColor: '#0b1020' }}
                     onMouseScroll={(event) => {
                         if (!rowsFocused) {
@@ -332,6 +431,10 @@ keys:
                         }
 
                         if (!event.scroll) {
+                            return
+                        }
+
+                        if (!scrollState.overflowY) {
                             return
                         }
 
@@ -352,7 +455,12 @@ keys:
                         }
                     }}
                 >
-                    <box flexDirection="column" width="100%" paddingLeft={1} paddingRight={1}>
+                    <box
+                        flexDirection="column"
+                        width={tableContentWidth}
+                        paddingLeft={1}
+                        paddingRight={1}
+                    >
                         <text fg="#cbd5f0">{tableView.body}</text>
                     </box>
                 </scrollbox>
@@ -361,7 +469,7 @@ keys:
 
                 <box flexDirection="row" justifyContent="space-between" width="100%">
                     <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                        {'PgUp/PgDn page  Left/Right limit  j/k scroll  h help'}
+                        {'j/k scroll  h/l horiz when overflow  tab focus'}
                     </text>
                     <text attributes={TextAttributes.DIM} fg="#9aa4c5">
                         {'q quit'}
@@ -370,6 +478,14 @@ keys:
             </box>
         </box>
     )
+}
+
+type ScrollState = {
+    overflowY: boolean
+    overflowX: boolean
+    viewportRows: number
+    viewportWidth: number
+    tableContentWidth: number
 }
 
 type KeyHandlingState = {
@@ -382,6 +498,10 @@ type KeyHandlingState = {
 
     tableState: TableState
     setTableState: (updater: (prev: TableState) => TableState) => void
+
+    scrollState: ScrollState
+    rowsScrollRef: RefObject<ScrollBoxRenderable | null>
+    headerScrollRef: RefObject<ScrollBoxRenderable | null>
 
     requestExit: () => void
 }
@@ -445,25 +565,11 @@ function handleRowsKey(key: KeyEvent, state: KeyHandlingState): boolean {
         return false
     }
 
-    const pageStep = state.tableState.limit
-
-    if (key.name === 'pageup') {
-        state.setTableState((prev) => ({
-            ...prev,
-            offset: Math.max(0, prev.offset - pageStep),
-        }))
-        return true
-    }
-
-    if (key.name === 'pagedown') {
-        state.setTableState((prev) => ({
-            ...prev,
-            offset: prev.offset + pageStep,
-        }))
-        return true
-    }
-
     if (key.name === 'j' || key.name === 'down') {
+        if (!state.scrollState.overflowY) {
+            return true
+        }
+
         state.setTableState((prev) => ({
             ...prev,
             offset: prev.offset + 1,
@@ -472,6 +578,10 @@ function handleRowsKey(key: KeyEvent, state: KeyHandlingState): boolean {
     }
 
     if (key.name === 'k' || key.name === 'up') {
+        if (!state.scrollState.overflowY) {
+            return true
+        }
+
         state.setTableState((prev) => ({
             ...prev,
             offset: Math.max(0, prev.offset - 1),
@@ -479,21 +589,49 @@ function handleRowsKey(key: KeyEvent, state: KeyHandlingState): boolean {
         return true
     }
 
-    if (key.name === 'left') {
-        state.setTableState((prev) => ({
-            ...prev,
-            limit: clamp(prev.limit - 5, 5, 200),
-            offset: Math.max(0, prev.offset),
-        }))
+    if (key.name === 'h') {
+        if (!state.scrollState.overflowX) {
+            return true
+        }
+
+        const step = Math.max(1, Math.floor(state.scrollState.viewportWidth / SCROLL_STEP_DIVISOR))
+        const scrollbox = state.rowsScrollRef.current
+        if (!scrollbox) {
+            return true
+        }
+
+        const maxScrollLeft = Math.max(
+            0,
+            state.scrollState.tableContentWidth - state.scrollState.viewportWidth,
+        )
+        const nextScrollLeft = Math.max(0, scrollbox.scrollLeft - step)
+        scrollbox.scrollLeft = Math.min(nextScrollLeft, maxScrollLeft)
+        if (state.headerScrollRef.current) {
+            state.headerScrollRef.current.scrollLeft = scrollbox.scrollLeft
+        }
         return true
     }
 
-    if (key.name === 'right') {
-        state.setTableState((prev) => ({
-            ...prev,
-            limit: clamp(prev.limit + 5, 5, 200),
-            offset: Math.max(0, prev.offset),
-        }))
+    if (key.name === 'l') {
+        if (!state.scrollState.overflowX) {
+            return true
+        }
+
+        const step = Math.max(1, Math.floor(state.scrollState.viewportWidth / SCROLL_STEP_DIVISOR))
+        const scrollbox = state.rowsScrollRef.current
+        if (!scrollbox) {
+            return true
+        }
+
+        const maxScrollLeft = Math.max(
+            0,
+            state.scrollState.tableContentWidth - state.scrollState.viewportWidth,
+        )
+        const nextScrollLeft = scrollbox.scrollLeft + step
+        scrollbox.scrollLeft = Math.min(nextScrollLeft, maxScrollLeft)
+        if (state.headerScrollRef.current) {
+            state.headerScrollRef.current.scrollLeft = scrollbox.scrollLeft
+        }
         return true
     }
 
