@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { computeTable } from "../src/table-format";
-import type { SqliteRow } from "../src/db";
+import { computeTable } from "./table-format";
+import type { SqliteRow } from "./db";
 
 describe("computeTable", () => {
     test("renders header and rows", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
-import { getTableColumns, getTablePage, listUserTables, parseDatabasePathFromArgs } from "../src/db";
+import { getTableColumns, getTablePage, listUserTables, parseDatabasePathFromArgs } from "./db";
 
 function createDb(): Database {
     const db = new Database(":memory:");

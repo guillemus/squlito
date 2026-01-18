@@ -16,7 +16,7 @@ type TableState = {
     error: string | null;
 };
 
-function App(props: { dbPath: string }) {
+function App(props: { dbPath: string; requestExit: () => void }) {
     const dims = useTerminalDimensions();
 
     const [focusArea, setFocusArea] = useState<FocusArea>("sidebar");
@@ -163,6 +163,7 @@ function App(props: { dbPath: string }) {
             setSelectedTableIndex,
             tableState,
             setTableState,
+            requestExit: props.requestExit,
         });
 
         if (handled) {
@@ -220,7 +221,7 @@ keys:
   enter: focus rows
   pgup/pgdn: page
   left/right: limit
-  q: quit
+  q/esc/ctrl+c: quit
 `;
 
     return (
@@ -356,19 +357,24 @@ type KeyHandlingState = {
 
     tableState: TableState;
     setTableState: (updater: (prev: TableState) => TableState) => void;
+
+    requestExit: () => void;
 };
 
 function handleGlobalKey(key: KeyEvent, state: KeyHandlingState): boolean {
     if (key.ctrl && key.name === "c") {
-        process.exit(0);
+        state.requestExit();
+        return true;
     }
 
     if (key.name === "q") {
-        process.exit(0);
+        state.requestExit();
+        return true;
     }
 
     if (key.name === "escape") {
-        process.exit(0);
+        state.requestExit();
+        return true;
     }
 
     if (key.name === "tab") {
@@ -488,4 +494,26 @@ const renderer = await createCliRenderer({
     exitOnCtrlC: true,
 });
 
-createRoot(renderer).render(<App dbPath={path} />);
+const root = createRoot(renderer);
+
+let exitRequested = false;
+
+const requestExit = () => {
+    if (exitRequested) {
+        return;
+    }
+
+    exitRequested = true;
+    root.unmount();
+    renderer.destroy();
+};
+
+process.once("SIGINT", () => {
+    requestExit();
+});
+
+process.once("SIGTERM", () => {
+    requestExit();
+});
+
+root.render(<App dbPath={path} requestExit={requestExit} />);
