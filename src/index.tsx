@@ -3,6 +3,8 @@ import {
     type KeyEvent,
     type ScrollBoxRenderable,
     TextAttributes,
+    type TextareaRenderable,
+    type KeyBinding,
 } from '@opentui/core'
 import { createRoot, useKeyboard, useTerminalDimensions } from '@opentui/react'
 import { type RefObject, useEffect, useMemo, useRef, useState } from 'react'
@@ -20,7 +22,7 @@ import {
 } from './db'
 import { computeTable } from './table-format'
 
-type FocusArea = 'sidebar' | 'rows'
+type FocusArea = 'sidebar' | 'rows' | 'query'
 
 type TableState = {
     name: string
@@ -33,10 +35,31 @@ type TableState = {
     error: string | null
 }
 
+type ViewMode = 'table' | 'query'
+
+type QueryState = {
+    sql: string
+    allRows: SqliteRow[]
+    columns: string[]
+    error: string | null
+    running: boolean
+}
+
 function App(props: { dbPath: string; requestExit: () => void }) {
     const dims = useTerminalDimensions()
 
     const [focusArea, setFocusArea] = useState<FocusArea>('sidebar')
+
+    const queryRef = useRef<TextareaRenderable>(null)
+
+    const [viewMode, setViewMode] = useState<ViewMode>('table')
+    const [queryState, setQueryState] = useState<QueryState>({
+        sql: '',
+        allRows: [],
+        columns: [],
+        error: null,
+        running: false,
+    })
 
     const [tables, setTables] = useState<SqliteTable[]>([])
     const [selectedTableIndex, setSelectedTableIndex] = useState(0)
@@ -55,44 +78,58 @@ function App(props: { dbPath: string; requestExit: () => void }) {
         error: null,
     })
 
+    const QUERY_BOX_HEIGHT = 7
+
     const sidebarWidth = clamp(Math.floor(dims.width * 0.28), 22, 40)
     const mainWidth = Math.max(20, dims.width - sidebarWidth)
     const tableViewportWidth = Math.max(10, mainWidth - 4)
-    const tableViewportHeight = Math.max(3, dims.height - 8)
+    const tableViewportHeight = Math.max(3, dims.height - 8 - QUERY_BOX_HEIGHT)
+
+    const isQueryMode = viewMode === 'query'
+
+    const visibleRows = isQueryMode ? queryState.allRows : tableState.rows
+    const visibleColumns = isQueryMode ? queryState.columns : tableState.columns
+    const visibleError = isQueryMode ? queryState.error : tableState.error
+
+    const viewRowCount = isQueryMode ? queryState.allRows.length : tableState.totalRows
+    const viewOffset = isQueryMode ? 0 : tableState.offset
 
     const tableView = useMemo(() => {
-        if (tableState.error) {
+        if (visibleError) {
+            const width = measureMessageWidth(visibleError)
             return {
                 header: '',
-                body: tableState.error,
-                width: 0,
+                body: visibleError,
+                width,
                 rowCount: 0,
             }
         }
 
-        if (tableState.name.length === 0) {
+        if (!isQueryMode && tableState.name.length === 0) {
+            const body = 'No table selected'
             return {
                 header: '',
-                body: 'No table selected',
-                width: 0,
+                body,
+                width: measureMessageWidth(body),
                 rowCount: 0,
             }
         }
 
-        if (tableState.columns.length === 0) {
+        if (visibleColumns.length === 0) {
+            const body = '(empty)'
             return {
                 header: '',
-                body: '(empty)',
-                width: 0,
+                body,
+                width: measureMessageWidth(body),
                 rowCount: 0,
             }
         }
 
         return computeTable({
-            columns: tableState.columns,
-            rows: tableState.rows,
+            columns: visibleColumns,
+            rows: visibleRows,
         })
-    }, [tableState.columns, tableState.error, tableState.name, tableState.rows])
+    }, [isQueryMode, tableState.name, visibleColumns, visibleError, visibleRows])
 
     const tableContentWidth = tableView.width + 2
 
@@ -111,12 +148,13 @@ function App(props: { dbPath: string; requestExit: () => void }) {
 
     const sidebarFocused = focusArea === 'sidebar'
     const rowsFocused = focusArea === 'rows'
+    const queryFocused = focusArea === 'query'
 
-    const rowScrollDelta = tableState.offset - tableState.bufferStart
-    const showStart = tableState.totalRows === 0 ? 0 : tableState.offset + 1
-    let showEnd = tableState.offset + tableViewportHeight
-    if (tableState.totalRows > 0) {
-        showEnd = Math.min(tableState.totalRows, showEnd)
+    const rowScrollDelta = viewOffset - tableState.bufferStart
+    const showStart = viewRowCount === 0 ? 0 : viewOffset + 1
+    let showEnd = viewOffset + tableViewportHeight
+    if (viewRowCount > 0) {
+        showEnd = Math.min(viewRowCount, showEnd)
     }
 
     useEffect(() => {
@@ -158,6 +196,10 @@ function App(props: { dbPath: string; requestExit: () => void }) {
     }, [props.dbPath])
 
     useEffect(() => {
+        if (viewMode !== 'table') {
+            return
+        }
+
         const selectedName = tables[selectedTableIndex]?.name
         if (!selectedName) {
             return
@@ -178,9 +220,13 @@ function App(props: { dbPath: string; requestExit: () => void }) {
         if (rowsScrollRef.current) {
             rowsScrollRef.current.scrollTop = 0
         }
-    }, [selectedTableIndex, tables, tableState.name])
+    }, [selectedTableIndex, tables, tableState.name, viewMode])
 
     useEffect(() => {
+        if (viewMode !== 'table') {
+            return
+        }
+
         if (tableState.name.length === 0) {
             return
         }
@@ -216,9 +262,13 @@ function App(props: { dbPath: string; requestExit: () => void }) {
                 bufferStart: nextBufferStart,
             }
         })
-    }, [scrollState.viewportRows, tableState.name, tableState.totalRows])
+    }, [scrollState.viewportRows, tableState.name, tableState.totalRows, viewMode])
 
     useEffect(() => {
+        if (viewMode !== 'table') {
+            return
+        }
+
         if (tableState.name.length === 0) {
             return
         }
@@ -259,7 +309,7 @@ function App(props: { dbPath: string; requestExit: () => void }) {
         } finally {
             db.close()
         }
-    }, [props.dbPath, tableState.name, tableState.bufferSize, tableState.bufferStart])
+    }, [props.dbPath, tableState.name, tableState.bufferSize, tableState.bufferStart, viewMode])
 
     useEffect(() => {
         if (!rowsScrollRef.current) {
@@ -308,9 +358,22 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             return
         }
 
+        if (focusArea === 'query') {
+            if (key.name === 'tab') {
+                setFocusArea('sidebar')
+                key.preventDefault()
+                key.stopPropagation()
+                return
+            }
+
+            return
+        }
+
         const handled = handleGlobalKey(key, {
             focusArea,
             setFocusArea,
+            viewMode,
+            setViewMode,
             tablesCount: tables.length,
             selectedTableIndex,
             setSelectedTableIndex,
@@ -327,6 +390,69 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             key.stopPropagation()
         }
     })
+
+    const queryKeyBindings: KeyBinding[] = [
+        { name: 'return', shift: true, action: 'newline' },
+        { name: 'return', action: 'submit' },
+    ]
+
+    const runQuery = (sql: string): void => {
+        const trimmed = sql.trim()
+        if (trimmed.length === 0) {
+            setQueryState((prev) => ({
+                ...prev,
+                sql: '',
+                allRows: [],
+                columns: [],
+                error: 'Query is empty',
+                running: false,
+            }))
+            return
+        }
+
+        setViewMode('query')
+        setQueryState((prev) => ({
+            ...prev,
+            sql: trimmed,
+            error: null,
+            running: true,
+        }))
+
+        const db = openDatabase(props.dbPath)
+        try {
+            const stmt = db.query<SqliteRow, []>(trimmed)
+            const rows = stmt.all()
+
+            let columns = stmt.columnNames
+            if (columns.length === 0 && rows.length > 0) {
+                const first = rows[0]
+                if (first) {
+                    columns = Object.keys(first)
+                }
+            }
+
+            setQueryState((prev) => ({
+                ...prev,
+                sql: trimmed,
+                allRows: rows,
+                columns,
+                error: null,
+                running: false,
+            }))
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err)
+            setQueryState((prev) => ({
+                ...prev,
+                sql: trimmed,
+                allRows: [],
+                columns: [],
+                error: message,
+                running: false,
+            }))
+        } finally {
+            db.close()
+        }
+    }
 
     return (
         <box flexDirection="row" width="100%" height="100%" backgroundColor="#0b1020">
@@ -369,6 +495,7 @@ function App(props: { dbPath: string; requestExit: () => void }) {
                                     backgroundColor={rowBackground}
                                     onMouseDown={() => {
                                         setSelectedTableIndex(index)
+                                        setViewMode('table')
                                         setFocusArea('sidebar')
                                     }}
                                 >
@@ -386,7 +513,7 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             </box>
 
             <box
-                title={tableState.name.length > 0 ? tableState.name : 'Rows'}
+                title={getRowsTitle({ tableState, queryState, viewMode })}
                 border={true}
                 borderStyle="single"
                 borderColor="#2a355a"
@@ -398,7 +525,7 @@ function App(props: { dbPath: string; requestExit: () => void }) {
             >
                 <box flexDirection="row" justifyContent="space-between" width="100%">
                     <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                        {`Rows ${tableState.totalRows}  Showing ${showStart}-${showEnd}`}
+                        {`Rows ${viewRowCount}  Showing ${showStart}-${showEnd}`}
                     </text>
                     <text attributes={TextAttributes.DIM} fg="#9aa4c5">
                         {rowsFocused ? '[Tab] tables' : '[Tab] rows'}
@@ -474,13 +601,58 @@ function App(props: { dbPath: string; requestExit: () => void }) {
 
                 <box height={1} />
 
-                <box flexDirection="row" justifyContent="space-between" width="100%">
-                    <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                        {'j/k scroll  h/l horiz when overflow  tab focus'}
-                    </text>
-                    <text attributes={TextAttributes.DIM} fg="#9aa4c5">
-                        {'q quit'}
-                    </text>
+                <box height={1} />
+
+                <box
+                    title={'Query'}
+                    border={true}
+                    borderStyle="single"
+                    borderColor="#2a355a"
+                    focusedBorderColor={queryFocused ? '#f7c948' : '#2a355a'}
+                    height={QUERY_BOX_HEIGHT}
+                    width="100%"
+                    flexDirection="column"
+                    paddingLeft={1}
+                    paddingRight={1}
+                    onMouseDown={() => {
+                        setFocusArea('query')
+                        queryRef.current?.focus()
+                    }}
+                >
+                    <box height={1} />
+                    <textarea
+                        ref={queryRef}
+                        focused={queryFocused}
+                        placeholder={"Write SQL... (Enter runs, Shift+Enter newline)"}
+                        keyBindings={queryKeyBindings}
+                        onMouseDown={() => {
+                            setFocusArea('query')
+                            queryRef.current?.focus()
+                        }}
+                        onSubmit={() => {
+                            const sql = queryRef.current?.plainText ?? ''
+                            runQuery(sql)
+                        }}
+                        backgroundColor={'#0b1020'}
+                        focusedBackgroundColor={'#121a33'}
+                        textColor={'#cbd5f0'}
+                        focusedTextColor={'#d4defc'}
+                        style={{ flexGrow: 1 }}
+                    />
+
+                    <box height={1} />
+                    <box flexDirection="row" justifyContent="space-between" width="100%">
+                        <text attributes={TextAttributes.DIM} fg="#9aa4c5">
+                            {queryState.error
+                                ? `Error: ${queryState.error}`
+                                : queryState.running
+                                  ? 'Running query...'
+                                  : 'Enter run  Shift+Enter newline  Tab focus'}
+                        </text>
+                        <text attributes={TextAttributes.DIM} fg="#9aa4c5">
+                            {'q quit'}
+                        </text>
+                    </box>
                 </box>
             </box>
         </box>
@@ -498,6 +670,9 @@ type ScrollState = {
 type KeyHandlingState = {
     focusArea: FocusArea
     setFocusArea: (area: FocusArea) => void
+
+    viewMode: ViewMode
+    setViewMode: (mode: ViewMode) => void
 
     tablesCount: number
     selectedTableIndex: number
@@ -530,7 +705,19 @@ function handleGlobalKey(key: KeyEvent, state: KeyHandlingState): boolean {
     }
 
     if (key.name === 'tab') {
-        const next: FocusArea = state.focusArea === 'sidebar' ? 'rows' : 'sidebar'
+        let next: FocusArea = 'sidebar'
+        if (state.focusArea === 'sidebar') {
+            next = 'rows'
+        }
+
+        if (state.focusArea === 'rows') {
+            next = 'query'
+        }
+
+        if (state.focusArea === 'query') {
+            next = 'sidebar'
+        }
+
         state.setFocusArea(next)
         return true
     }
@@ -539,7 +726,11 @@ function handleGlobalKey(key: KeyEvent, state: KeyHandlingState): boolean {
         return handleSidebarKey(key, state)
     }
 
-    return handleRowsKey(key, state)
+    if (state.focusArea === 'rows') {
+        return handleRowsKey(key, state)
+    }
+
+    return false
 }
 
 function handleSidebarKey(key: KeyEvent, state: KeyHandlingState): boolean {
@@ -560,6 +751,7 @@ function handleSidebarKey(key: KeyEvent, state: KeyHandlingState): boolean {
     }
 
     if (key.name === 'return') {
+        state.setViewMode('table')
         state.setFocusArea('rows')
         return true
     }
@@ -645,6 +837,50 @@ function handleRowsKey(key: KeyEvent, state: KeyHandlingState): boolean {
     return false
 }
 
+function getRowsTitle(props: {
+    tableState: TableState
+    queryState: QueryState
+    viewMode: ViewMode
+}): string {
+    if (props.viewMode === 'query') {
+        const singleLine = props.queryState.sql.replaceAll('\n', ' ').trim()
+        if (singleLine.length === 0) {
+            return 'Query'
+        }
+
+        return truncateTitle(singleLine, 60)
+    }
+
+    if (props.tableState.name.length > 0) {
+        return props.tableState.name
+    }
+
+    return 'Rows'
+}
+
+function truncateTitle(value: string, maxChars: number): string {
+    if (value.length <= maxChars) {
+        return value
+    }
+
+    const safeMax = Math.max(0, maxChars - 3)
+    return `${value.slice(0, safeMax)}...`
+}
+
+function measureMessageWidth(value: string): number {
+    if (value.length === 0) {
+        return 0
+    }
+
+    let max = 0
+    for (const line of value.split('\n')) {
+        if (line.length > max) {
+            max = line.length
+        }
+    }
+    return max
+}
+
 function clamp(value: number, min: number, max: number): number {
     if (value < min) {
         return min
@@ -662,6 +898,7 @@ const path = parseDatabasePathFromArgs(process.argv)
 const renderer = await createCliRenderer({
     useMouse: true,
     exitOnCtrlC: true,
+    useKittyKeyboard: {},
 })
 
 const root = createRoot(renderer)
