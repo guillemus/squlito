@@ -24,9 +24,10 @@ const (
 type FocusArea string
 
 const (
-    focusSidebar FocusArea = "sidebar"
-    focusRows    FocusArea = "rows"
-    focusQuery   FocusArea = "query"
+	focusSidebar FocusArea = "sidebar"
+	focusRows    FocusArea = "rows"
+	focusQuery   FocusArea = "query"
+	focusModal   FocusArea = "modal"
 )
 
 type ViewMode string
@@ -123,12 +124,11 @@ func measureMessageWidth(value string) int {
     }
 
     max := 0
-    parts := strings.Split(value, "\n")
-    for _, part := range parts {
-        if len(part) > max {
-            max = len(part)
-        }
-    }
+	for part := range strings.SplitSeq(value, "\n") {
+		if len(part) > max {
+			max = len(part)
+		}
+	}
 
     return max
 }

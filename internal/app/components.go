@@ -86,3 +86,15 @@ func StatusBar(app *App, view *gocui.View) {
 	line := renderStatusLine(width, left, right)
 	_, _ = fmt.Fprint(view, line)
 }
+
+func Modal(app *App, view *gocui.View) {
+	view.Clear()
+	view.Title = app.modalTitle
+
+	if app.modalScroll < 0 {
+		app.modalScroll = 0
+	}
+
+	_ = view.SetOrigin(0, app.modalScroll)
+	_, _ = fmt.Fprint(view, app.modalBody)
+}

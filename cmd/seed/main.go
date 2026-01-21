@@ -47,8 +47,9 @@ func parseSeedArgs(args []string) seedConfig {
 	dbPath := "data/seed.db"
 
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "--db=") {
-			dbPath = strings.TrimPrefix(arg, "--db=")
+		value, ok := strings.CutPrefix(arg, "--db=")
+		if ok {
+			dbPath = value
 			continue
 		}
 

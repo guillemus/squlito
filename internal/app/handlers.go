@@ -100,26 +100,51 @@ func (app *App) bindKeys() error {
     if err := gui.SetKeybinding("rowsBody", gocui.MouseWheelDown, gocui.ModNone, app.handleRowsWheelDown); err != nil {
         return err
     }
-    if err := gui.SetKeybinding("rowsBody", gocui.MouseWheelUp, gocui.ModNone, app.handleRowsWheelUp); err != nil {
-        return err
-    }
+	if err := gui.SetKeybinding("rowsBody", gocui.MouseWheelUp, gocui.ModNone, app.handleRowsWheelUp); err != nil {
+		return err
+	}
 
-    return nil
+	if err := gui.SetKeybinding(modalViewName, gocui.KeyEsc, gocui.ModNone, app.handleModalClose); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding(modalViewName, gocui.KeyEnter, gocui.ModNone, app.handleModalClose); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding(modalViewName, 'q', gocui.ModNone, app.handleModalClose); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding(modalViewName, gocui.KeyArrowDown, gocui.ModNone, app.handleModalDown); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding(modalViewName, 'j', gocui.ModNone, app.handleModalDown); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding(modalViewName, gocui.KeyArrowUp, gocui.ModNone, app.handleModalUp); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding(modalViewName, 'k', gocui.ModNone, app.handleModalUp); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (app *App) setFocus(area FocusArea) error {
     app.focusArea = area
 
     var viewName string
-    if area == focusSidebar {
-        viewName = "sidebar"
-    }
-    if area == focusRows {
-        viewName = "rowsBody"
-    }
-    if area == focusQuery {
-        viewName = "query"
-    }
+	if area == focusSidebar {
+		viewName = "sidebar"
+	}
+	if area == focusRows {
+		viewName = "rowsBody"
+	}
+	if area == focusQuery {
+		viewName = "query"
+	}
+	if area == focusModal {
+		viewName = modalViewName
+	}
 
     if viewName != "" {
         _, err := app.gui.SetCurrentView(viewName)
@@ -317,11 +342,19 @@ func (app *App) handleSidebarClick(gui *gocui.Gui, view *gocui.View) error {
 func (app *App) handleRowsClick(gui *gocui.Gui, view *gocui.View) error {
 	logEvent("rows-click")
 	err := app.setFocus(focusRows)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    return app.render()
+	opened, err := app.openModalForCell(view)
+	if err != nil {
+		return err
+	}
+	if opened {
+		return app.render()
+	}
+
+	return app.render()
 }
 
 func (app *App) handleQueryClick(gui *gocui.Gui, view *gocui.View) error {
@@ -342,6 +375,28 @@ func (app *App) handleRowsWheelDown(gui *gocui.Gui, view *gocui.View) error {
 func (app *App) handleRowsWheelUp(gui *gocui.Gui, view *gocui.View) error {
 	logEvent("rows-wheel-up")
 	return app.scrollRows(-3)
+}
+
+func (app *App) handleModalClose(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("modal-close")
+	err := app.closeModal()
+	if err != nil {
+		return err
+	}
+
+	return app.render()
+}
+
+func (app *App) handleModalDown(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("modal-down")
+	app.modalScroll += 1
+	return app.render()
+}
+
+func (app *App) handleModalUp(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("modal-up")
+	app.modalScroll -= 1
+	return app.render()
 }
 
 func (app *App) scrollRows(delta int) error {

@@ -1,17 +1,20 @@
 package tableformat
 
 import (
-    "fmt"
-    "strconv"
+	"fmt"
+	"strconv"
+	"strings"
 
-    "squlito/internal/db"
+	"squlito/internal/db"
 )
 
 type TableRender struct {
-    Header   string
-    Body     string
-    Width    int
-    RowCount int
+	Header   string
+	Body     string
+	Width    int
+	RowCount int
+	ColumnWidths  []int
+	SeparatorWidth int
 }
 
 type ComputeTableConfig struct {
@@ -56,11 +59,8 @@ func ComputeTable(config ComputeTableConfig) TableRender {
         widths[i] = clampInt(widths[i], minColWidth, 50)
     }
 
-    separatorWidth := 3
-    totalSeparators := len(config.Columns) - 1
-    if totalSeparators < 0 {
-        totalSeparators = 0
-    }
+	separatorWidth := columnSeparatorWidth
+	totalSeparators := max(0, len(config.Columns)-1)
 
     totalWidth := 0
     for _, w := range widths {
@@ -80,9 +80,9 @@ func ComputeTable(config ComputeTableConfig) TableRender {
     }
 
     header := ""
-    if len(headerCells) > 0 {
-        header = joinCells(headerCells)
-    }
+	if len(headerCells) > 0 {
+		header = joinCells(headerCells)
+	}
 
     bodyLines := []string{}
     for _, row := range visibleRows {
@@ -105,12 +105,18 @@ func ComputeTable(config ComputeTableConfig) TableRender {
         body = joinLines(bodyLines)
     }
 
-    return TableRender{
-        Header:   header,
-        Body:     body,
-        Width:    totalWidth,
-        RowCount: len(visibleRows),
-    }
+	return TableRender{
+		Header:   header,
+		Body:     body,
+		Width:    totalWidth,
+		RowCount: len(visibleRows),
+		ColumnWidths:  widths,
+		SeparatorWidth: separatorWidth,
+	}
+}
+
+func FormatCell(value db.SqliteValue) string {
+	return formatCell(value)
 }
 
 func formatCell(value db.SqliteValue) string {
@@ -173,29 +179,31 @@ func stringWidth(value string) int {
 }
 
 func joinCells(cells []string) string {
-    if len(cells) == 0 {
-        return ""
-    }
+	if len(cells) == 0 {
+		return ""
+	}
 
-    output := cells[0]
-    for i := 1; i < len(cells); i += 1 {
-        output += " | "
-        output += cells[i]
-    }
-    return output
+	var builder strings.Builder
+	builder.WriteString(cells[0])
+	for i := 1; i < len(cells); i += 1 {
+		builder.WriteString(columnSeparator)
+		builder.WriteString(cells[i])
+	}
+	return builder.String()
 }
 
 func joinLines(lines []string) string {
-    if len(lines) == 0 {
-        return ""
-    }
+	if len(lines) == 0 {
+		return ""
+	}
 
-    output := lines[0]
-    for i := 1; i < len(lines); i += 1 {
-        output += "\n"
-        output += lines[i]
-    }
-    return output
+	var builder strings.Builder
+	builder.WriteString(lines[0])
+	for i := 1; i < len(lines); i += 1 {
+		builder.WriteString("\n")
+		builder.WriteString(lines[i])
+	}
+	return builder.String()
 }
 
 func spaces(count int) string {
@@ -205,6 +213,10 @@ func spaces(count int) string {
 
     return fmt.Sprintf("%*s", count, "")
 }
+
+const columnSeparator = " | "
+
+const columnSeparatorWidth = 3
 
 func clampInt(value int, min int, max int) int {
     if value < min {

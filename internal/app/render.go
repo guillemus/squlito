@@ -32,7 +32,12 @@ func (app *App) render() error {
 		QueryPanel(app, queryView)
 	}
 
-	app.applyFocusStyles(sidebarView, rowsHeaderView, rowsBodyView, queryView)
+	modalView, _ := app.gui.View(modalViewName)
+	if modalView != nil && app.modalOpen {
+		Modal(app, modalView)
+	}
+
+	app.applyFocusStyles(sidebarView, rowsHeaderView, rowsBodyView, queryView, modalView)
 
 	Sidebar(app, sidebarView)
 
@@ -84,7 +89,7 @@ func (app *App) render() error {
 	return nil
 }
 
-func (app *App) applyFocusStyles(sidebarView *gocui.View, rowsHeaderView *gocui.View, rowsBodyView *gocui.View, queryView *gocui.View) {
+func (app *App) applyFocusStyles(sidebarView *gocui.View, rowsHeaderView *gocui.View, rowsBodyView *gocui.View, queryView *gocui.View, modalView *gocui.View) {
 	focusColor := gocui.ColorGreen
 	defaultColor := gocui.ColorDefault
 
@@ -92,6 +97,7 @@ func (app *App) applyFocusStyles(sidebarView *gocui.View, rowsHeaderView *gocui.
 	setViewFocusStyle(rowsHeaderView, app.focusArea == focusRows, focusColor, defaultColor)
 	setViewFocusStyle(rowsBodyView, app.focusArea == focusRows, focusColor, defaultColor)
 	setViewFocusStyle(queryView, app.focusArea == focusQuery, focusColor, defaultColor)
+	setViewFocusStyle(modalView, app.focusArea == focusModal, focusColor, defaultColor)
 }
 
 func setViewFocusStyle(view *gocui.View, focused bool, focusColor gocui.Attribute, defaultColor gocui.Attribute) {
@@ -124,19 +130,40 @@ func (app *App) buildTableView() (tableformat.TableRender, bool) {
 
 	if visibleError != "" {
 		width := measureMessageWidth(visibleError)
-		return tableformat.TableRender{Header: "", Body: visibleError, Width: width, RowCount: 0}, true
+		return tableformat.TableRender{
+			Header:         "",
+			Body:           visibleError,
+			Width:          width,
+			RowCount:       0,
+			ColumnWidths:   nil,
+			SeparatorWidth: 0,
+		}, true
 	}
 
 	if !isQueryMode && app.tableState.Name == "" {
 		body := "No table selected"
 		width := measureMessageWidth(body)
-		return tableformat.TableRender{Header: "", Body: body, Width: width, RowCount: 0}, true
+		return tableformat.TableRender{
+			Header:         "",
+			Body:           body,
+			Width:          width,
+			RowCount:       0,
+			ColumnWidths:   nil,
+			SeparatorWidth: 0,
+		}, true
 	}
 
 	if len(visibleColumns) == 0 {
 		body := "(empty)"
 		width := measureMessageWidth(body)
-		return tableformat.TableRender{Header: "", Body: body, Width: width, RowCount: 0}, true
+		return tableformat.TableRender{
+			Header:         "",
+			Body:           body,
+			Width:          width,
+			RowCount:       0,
+			ColumnWidths:   nil,
+			SeparatorWidth: 0,
+		}, true
 	}
 
 	tableView := tableformat.ComputeTable(tableformat.ComputeTableConfig{
@@ -276,6 +303,10 @@ func (app *App) buildStatusRight() string {
 		return "Enter run  Shift+Enter newline  Tab tables  q quit"
 	}
 
+	if app.focusArea == focusModal {
+		return "Esc close  j/k scroll"
+	}
+
 	return "Tab cycle  q quit"
 }
 
@@ -316,9 +347,7 @@ func renderStatusLine(width int, left string, right string) string {
 	}
 
 	padding := width - len(left) - len(right)
-	if padding < 1 {
-		padding = 1
-	}
+	padding = max(1, padding)
 
 	return left + strings.Repeat(" ", padding) + right
 }

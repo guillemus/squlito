@@ -28,6 +28,12 @@ type App struct {
 	sidebarScroll int
 
 	initialFocusApplied bool
+
+	modalOpen      bool
+	modalTitle     string
+	modalBody      string
+	modalScroll    int
+	modalPrevFocus FocusArea
 }
 
 func Run(dbPath string) error {
@@ -103,6 +109,11 @@ func NewApp(dbPath string, gui *gocui.Gui) *App {
 		scrollX:       0,
 		sidebarScroll: 0,
 		initialFocusApplied: false,
+		modalOpen:      false,
+		modalTitle:     "",
+		modalBody:      "",
+		modalScroll:    0,
+		modalPrevFocus: focusSidebar,
 	}
 }
 
@@ -163,6 +174,22 @@ func (app *App) layout(gui *gocui.Gui) error {
 			return err
 		}
 		app.initialFocusApplied = true
+	}
+
+	if app.modalOpen {
+		err = app.layoutModal(gui, maxX, maxY)
+		if err != nil {
+			return err
+		}
+
+		if app.focusArea == focusModal {
+			err = app.setFocus(focusModal)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		app.clearModal(gui)
 	}
 
 	return app.render()

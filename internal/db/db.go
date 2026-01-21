@@ -155,9 +155,7 @@ func GetTableColumns(db *sql.DB, tableName string) (columns []SqliteColumn, err 
 func GetTablePage(db *sql.DB, tableName string, limit int, offset int) (TablePage, error) {
 	safeLimit := clampInt(limit, 1, 500)
 	safeOffset := offset
-	if safeOffset < 0 {
-		safeOffset = 0
-	}
+	safeOffset = max(0, safeOffset)
 
 	countSql := fmt.Sprintf("SELECT COUNT(*) AS count FROM %s", quoteIdentifier(tableName))
 	countRow := db.QueryRow(countSql)

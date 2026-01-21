@@ -25,10 +25,8 @@ func calculateLayout(maxX int, maxY int) layoutMetrics {
     sidebarWidth := int(math.Round(float64(maxX) * sidebarWidthRatio))
     sidebarWidth = clampInt(sidebarWidth, sidebarWidthMin, sidebarWidthMax)
 
-    maxSidebar := maxX - minimumMainWidth
-    if maxSidebar < sidebarWidthMin {
-        maxSidebar = sidebarWidthMin
-    }
+	maxSidebar := maxX - minimumMainWidth
+	maxSidebar = max(maxSidebar, sidebarWidthMin)
 
     if sidebarWidth > maxSidebar {
         sidebarWidth = maxSidebar
