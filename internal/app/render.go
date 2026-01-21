@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/awesome-gocui/gocui"
-
 	"squlito/internal/tableformat"
 )
 
@@ -28,16 +26,11 @@ func (app *App) render() error {
 	}
 
 	queryView, _ := app.gui.View("query")
-
 	if queryView != nil {
-		if app.queryState.SQL == "" {
-			queryView.Title = "Query"
-		} else {
-			queryView.Title = truncateTitle(app.queryState.SQL)
-		}
+		QueryPanel(app, queryView)
 	}
 
-	app.renderSidebar(sidebarView)
+	Sidebar(app, sidebarView)
 
 	viewportWidth, viewportHeight := rowsBodyView.Size()
 	if viewportWidth < 1 {
@@ -80,81 +73,11 @@ func (app *App) render() error {
 
 	rowsHeaderView.Title = app.getRowsTitle()
 
-	app.renderRowsHeader(rowsHeaderView, tableView)
-	app.renderRowsBody(rowsBodyView, tableView, viewOffset, messageView)
-	app.renderStatus(statusView)
+	RowsHeader(app, rowsHeaderView, tableView)
+	RowsBody(app, rowsBodyView, tableView, viewOffset, messageView)
+	StatusBar(app, statusView)
 
 	return nil
-}
-
-func (app *App) renderSidebar(view *gocui.View) {
-	view.Clear()
-
-	width, height := view.Size()
-	if width < 1 || height < 1 {
-		return
-	}
-
-	app.updateSidebarScroll(height)
-	_ = view.SetOrigin(0, app.sidebarScroll)
-
-	for index, table := range app.tables {
-		prefix := "  "
-		if index == app.selectedTableIndex {
-			prefix = "> "
-		}
-
-		line := prefix + table.Name
-		_, _ = fmt.Fprintln(view, line)
-	}
-}
-
-func (app *App) renderRowsHeader(view *gocui.View, tableView tableformat.TableRender) {
-	view.Clear()
-
-	if tableView.Header == "" {
-		return
-	}
-
-	_ = view.SetOrigin(app.scrollX, 0)
-	_, _ = fmt.Fprintln(view, tableView.Header)
-}
-
-func (app *App) renderRowsBody(view *gocui.View, tableView tableformat.TableRender, viewOffset int, messageView bool) {
-	view.Clear()
-
-	rowScrollDelta := 0
-	if app.viewMode == viewTable {
-		rowScrollDelta = viewOffset - app.tableState.BufferStart
-	} else {
-		rowScrollDelta = viewOffset
-	}
-
-	if rowScrollDelta < 0 {
-		rowScrollDelta = 0
-	}
-
-	if messageView {
-		rowScrollDelta = 0
-	}
-
-	_ = view.SetOrigin(app.scrollX, rowScrollDelta)
-
-	if tableView.Body == "" {
-		return
-	}
-
-	_, _ = fmt.Fprint(view, tableView.Body)
-}
-
-func (app *App) renderStatus(view *gocui.View) {
-	view.Clear()
-	width, _ := view.Size()
-
-	left := app.buildStatusLeft()
-	right := app.buildStatusRight()
-	line := renderStatusLine(width, left, right)
-	_, _ = fmt.Fprint(view, line)
 }
 
 func (app *App) buildTableView() (tableformat.TableRender, bool) {
