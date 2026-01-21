@@ -1,11 +1,11 @@
 Typecheck:
 
 ```bash
-bunx tsgo
+go build ./...
 ```
 
 Tests:
 
 ```bash
-bun test
+go test ./...
 ```

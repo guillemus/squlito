@@ -1,15 +1,31 @@
-# react
+# squlito
 
-To install dependencies:
+Terminal SQLite browser built with Go + gocui.
 
-```bash
-bun install
-```
-
-To run:
+## Seed data
 
 ```bash
-bun dev
+go run ./cmd/seed
 ```
 
-This project was created using `bun create tui`. [create-tui](https://git.new/create-tui) is the easiest way to get started with OpenTUI.
+## Run
+
+```bash
+go run ./cmd/squlito data/seed.db
+```
+
+## Build
+
+```bash
+go build ./...
+```
+
+## Test
+
+```bash
+go test ./...
+```
+
+Notes:
+- Query results cap at 10k rows and report truncation.
+- Cell display truncates to 50 chars.
