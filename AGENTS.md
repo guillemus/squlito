@@ -1,3 +1,6 @@
+Assume the terminal that squlito is being tested on is ghostty.
+
+
 Typecheck:
 
 ```bash

@@ -1,6 +1,11 @@
 package app
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/awesome-gocui/gocui"
 )
 
@@ -116,11 +121,13 @@ func (app *App) setFocus(area FocusArea) error {
 }
 
 func (app *App) quit(gui *gocui.Gui, view *gocui.View) error {
-    return gocui.ErrQuit
+	logEvent("quit")
+	return gocui.ErrQuit
 }
 
 func (app *App) handleTab(gui *gocui.Gui, view *gocui.View) error {
-    next := focusSidebar
+	logEvent("tab")
+	next := focusSidebar
     if app.focusArea == focusSidebar {
         next = focusRows
     }
@@ -140,9 +147,10 @@ func (app *App) handleTab(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleSidebarDown(gui *gocui.Gui, view *gocui.View) error {
-    if len(app.tables) == 0 {
-        return nil
-    }
+	logEvent("sidebar-down")
+	if len(app.tables) == 0 {
+		return nil
+	}
 
     next := clampInt(app.selectedTableIndex+1, 0, len(app.tables)-1)
     err := app.setSelectedTable(next)
@@ -154,9 +162,10 @@ func (app *App) handleSidebarDown(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleSidebarUp(gui *gocui.Gui, view *gocui.View) error {
-    if len(app.tables) == 0 {
-        return nil
-    }
+	logEvent("sidebar-up")
+	if len(app.tables) == 0 {
+		return nil
+	}
 
     next := clampInt(app.selectedTableIndex-1, 0, len(app.tables)-1)
     err := app.setSelectedTable(next)
@@ -168,7 +177,8 @@ func (app *App) handleSidebarUp(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleSidebarEnter(gui *gocui.Gui, view *gocui.View) error {
-    app.viewMode = viewTable
+	logEvent("sidebar-enter")
+	app.viewMode = viewTable
     err := app.setFocus(focusRows)
     if err != nil {
         return err
@@ -178,23 +188,28 @@ func (app *App) handleSidebarEnter(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleRowsDown(gui *gocui.Gui, view *gocui.View) error {
-    return app.scrollRows(1)
+	logEvent("rows-down")
+	return app.scrollRows(1)
 }
 
 func (app *App) handleRowsUp(gui *gocui.Gui, view *gocui.View) error {
-    return app.scrollRows(-1)
+	logEvent("rows-up")
+	return app.scrollRows(-1)
 }
 
 func (app *App) handleRowsLeft(gui *gocui.Gui, view *gocui.View) error {
-    return app.scrollHorizontal(-1)
+	logEvent("rows-left")
+	return app.scrollHorizontal(-1)
 }
 
 func (app *App) handleRowsRight(gui *gocui.Gui, view *gocui.View) error {
-    return app.scrollHorizontal(1)
+	logEvent("rows-right")
+	return app.scrollHorizontal(1)
 }
 
 func (app *App) handleQuerySubmit(gui *gocui.Gui, view *gocui.View) error {
-    content := view.Buffer()
+	logEvent("query-submit")
+	content := view.Buffer()
     err := app.runQuery(content)
     if err != nil {
         return nil
@@ -204,12 +219,15 @@ func (app *App) handleQuerySubmit(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleQueryNewline(gui *gocui.Gui, view *gocui.View) error {
-    view.EditWrite('\n')
-    return nil
+	start := time.Now()
+	view.EditWrite('\n')
+	appendLatencyLog(start, time.Since(start))
+	return nil
 }
 
 func (app *App) handleSidebarClick(gui *gocui.Gui, view *gocui.View) error {
-    err := app.setFocus(focusSidebar)
+	logEvent("sidebar-click")
+	err := app.setFocus(focusSidebar)
     if err != nil {
         return err
     }
@@ -229,7 +247,8 @@ func (app *App) handleSidebarClick(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleRowsClick(gui *gocui.Gui, view *gocui.View) error {
-    err := app.setFocus(focusRows)
+	logEvent("rows-click")
+	err := app.setFocus(focusRows)
     if err != nil {
         return err
     }
@@ -238,7 +257,8 @@ func (app *App) handleRowsClick(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleQueryClick(gui *gocui.Gui, view *gocui.View) error {
-    err := app.setFocus(focusQuery)
+	logEvent("query-click")
+	err := app.setFocus(focusQuery)
     if err != nil {
         return err
     }
@@ -247,17 +267,20 @@ func (app *App) handleQueryClick(gui *gocui.Gui, view *gocui.View) error {
 }
 
 func (app *App) handleRowsWheelDown(gui *gocui.Gui, view *gocui.View) error {
-    return app.scrollRows(3)
+	logEvent("rows-wheel-down")
+	return app.scrollRows(3)
 }
 
 func (app *App) handleRowsWheelUp(gui *gocui.Gui, view *gocui.View) error {
-    return app.scrollRows(-3)
+	logEvent("rows-wheel-up")
+	return app.scrollRows(-3)
 }
 
 func (app *App) scrollRows(delta int) error {
-    if delta == 0 {
-        return nil
-    }
+	logEvent("scroll-rows")
+	if delta == 0 {
+		return nil
+	}
 
     if !app.scrollState.OverflowY {
         return nil
@@ -277,11 +300,58 @@ func (app *App) scrollRows(delta int) error {
 }
 
 func (app *App) scrollHorizontal(delta int) error {
-    if delta == 0 {
-        return nil
-    }
+	logEvent("scroll-horizontal")
+	if delta == 0 {
+		return nil
+	}
 
     step := maxInt(1, app.scrollState.ViewportWidth/scrollStepDivisor)
-    app.scrollX += delta * step
-    return app.render()
+	app.scrollX += delta * step
+	return app.render()
+}
+
+func appendLatencyLog(start time.Time, duration time.Duration) {
+	file, err := openLogFile()
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	_, _ = fmt.Fprintf(file, "%s shift-enter %s\n", start.Format(time.RFC3339Nano), duration)
+}
+
+func logEvent(name string) {
+	file, err := openLogFile()
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	_, _ = fmt.Fprintf(file, "%s event %s\n", time.Now().Format(time.RFC3339Nano), name)
+}
+
+func logKeyEvent(source string, key gocui.Key, ch rune, mod gocui.Modifier) {
+	file, err := openLogFile()
+	if err != nil {
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	_, _ = fmt.Fprintf(file, "%s key %s key=%d ch=%d mod=%d\n", time.Now().Format(time.RFC3339Nano), source, key, ch, mod)
+}
+
+func openLogFile() (*os.File, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	}
+
+	path := filepath.Join(cwd, "debug.log")
+	return os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 }

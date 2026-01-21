@@ -175,7 +175,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 		queryView.Title = "Query"
 		queryView.Wrap = true
 		queryView.Editable = true
-		queryView.Editor = gocui.DefaultEditor
+		queryView.Editor = loggingEditor{next: gocui.DefaultEditor}
 	}
 
 	statusView, err := gui.SetView("status", 0, statusY0, maxX-1, statusY1, 0)
