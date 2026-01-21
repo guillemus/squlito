@@ -65,13 +65,41 @@ func Run(dbPath string) error {
 
 func NewApp(dbPath string, gui *gocui.Gui) *App {
 	return &App{
-		dbPath:    dbPath,
-		gui:       gui,
-		focusArea: focusSidebar,
-		viewMode:  viewTable,
+		dbPath:             dbPath,
+		db:                 nil,
+		gui:                gui,
+		focusArea:          focusSidebar,
+		viewMode:           viewTable,
+		tables:             nil,
+		selectedTableIndex: 0,
 		tableState: TableState{
-			BufferSize: bufferSize,
+			Name:        "",
+			TotalRows:   0,
+			Offset:      0,
+			BufferStart: 0,
+			BufferSize:  bufferSize,
+			Rows:        nil,
+			Columns:     nil,
+			Error:       "",
 		},
+		queryState: QueryState{
+			SQL:       "",
+			AllRows:   nil,
+			Columns:   nil,
+			Error:     "",
+			Running:   false,
+			Truncated: false,
+			Offset:    0,
+		},
+		scrollState: ScrollState{
+			OverflowY:         false,
+			OverflowX:         false,
+			ViewportRows:      0,
+			ViewportWidth:     0,
+			TableContentWidth: 0,
+		},
+		scrollX:       0,
+		sidebarScroll: 0,
 	}
 }
 
