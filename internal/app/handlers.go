@@ -1,7 +1,7 @@
 package app
 
 import (
-    "github.com/jroimartin/gocui"
+	"github.com/awesome-gocui/gocui"
 )
 
 func (app *App) bindKeys() error {
@@ -61,12 +61,15 @@ func (app *App) bindKeys() error {
         return err
     }
 
-    if err := gui.SetKeybinding("query", gocui.KeyEnter, gocui.ModNone, app.handleQuerySubmit); err != nil {
-        return err
-    }
-    if err := gui.SetKeybinding("query", gocui.KeyCtrlJ, gocui.ModNone, app.handleQueryNewline); err != nil {
-        return err
-    }
+	if err := gui.SetKeybinding("query", gocui.KeyEnter, gocui.ModNone, app.handleQuerySubmit); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding("query", gocui.KeyEnter, gocui.ModShift, app.handleQueryNewline); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding("query", gocui.KeyCtrlJ, gocui.ModNone, app.handleQueryNewline); err != nil {
+		return err
+	}
 
     if err := gui.SetKeybinding("sidebar", gocui.MouseLeft, gocui.ModNone, app.handleSidebarClick); err != nil {
         return err

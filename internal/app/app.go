@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/jroimartin/gocui"
+	"github.com/awesome-gocui/gocui"
 
 	"squlito/internal/db"
 )
@@ -29,7 +29,7 @@ type App struct {
 }
 
 func Run(dbPath string) error {
-	gui, err := gocui.NewGui(gocui.OutputNormal)
+	gui, err := gocui.NewGui(gocui.OutputNormal, false)
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 	statusY0 := usableHeight
 	statusY1 := maxY - 1
 
-	sidebarView, err := gui.SetView("sidebar", 0, 0, sidebarX1, usableHeight-1)
+	sidebarView, err := gui.SetView("sidebar", 0, 0, sidebarX1, usableHeight-1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -151,7 +151,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 		sidebarView.Wrap = false
 	}
 
-	rowsHeaderView, err := gui.SetView("rowsHeader", mainX0, 0, maxX-1, headerY1)
+	rowsHeaderView, err := gui.SetView("rowsHeader", mainX0, 0, maxX-1, headerY1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -159,7 +159,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 		rowsHeaderView.Wrap = false
 	}
 
-	rowsBodyView, err := gui.SetView("rowsBody", mainX0, rowsY0, maxX-1, rowsY1)
+	rowsBodyView, err := gui.SetView("rowsBody", mainX0, rowsY0, maxX-1, rowsY1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -167,7 +167,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 		rowsBodyView.Wrap = false
 	}
 
-	queryView, err := gui.SetView("query", mainX0, queryY0, maxX-1, queryY1)
+	queryView, err := gui.SetView("query", mainX0, queryY0, maxX-1, queryY1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -178,7 +178,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 		queryView.Editor = gocui.DefaultEditor
 	}
 
-	statusView, err := gui.SetView("status", 0, statusY0, maxX-1, statusY1)
+	statusView, err := gui.SetView("status", 0, statusY0, maxX-1, statusY1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
@@ -195,7 +195,7 @@ func (app *App) renderTiny(gui *gocui.Gui, maxX int, maxY int) error {
 		return nil
 	}
 
-	statusView, err := gui.SetView("status", 0, 0, maxX-1, maxY-1)
+	statusView, err := gui.SetView("status", 0, 0, maxX-1, maxY-1, 0)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
