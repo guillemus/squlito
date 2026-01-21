@@ -21,9 +21,21 @@ func (app *App) bindKeys() error {
     if err := gui.SetKeybinding("", 'q', gocui.ModNone, app.quit); err != nil {
         return err
     }
-    if err := gui.SetKeybinding("", gocui.KeyTab, gocui.ModNone, app.handleTab); err != nil {
-        return err
-    }
+	if err := gui.SetKeybinding("", gocui.KeyTab, gocui.ModNone, app.handleTab); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding("", gocui.KeyCtrlH, gocui.ModNone, app.handlePaneLeft); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding("", gocui.KeyCtrlJ, gocui.ModNone, app.handlePaneDown); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding("", gocui.KeyCtrlK, gocui.ModNone, app.handlePaneUp); err != nil {
+		return err
+	}
+	if err := gui.SetKeybinding("", gocui.KeyCtrlL, gocui.ModNone, app.handlePaneRight); err != nil {
+		return err
+	}
 
     if err := gui.SetKeybinding("sidebar", gocui.KeyArrowDown, gocui.ModNone, app.handleSidebarDown); err != nil {
         return err
@@ -116,8 +128,8 @@ func (app *App) setFocus(area FocusArea) error {
         }
     }
 
-    app.gui.Cursor = true
-    return nil
+	app.gui.Cursor = area == focusQuery
+	return nil
 }
 
 func (app *App) quit(gui *gocui.Gui, view *gocui.View) error {
@@ -205,6 +217,62 @@ func (app *App) handleRowsLeft(gui *gocui.Gui, view *gocui.View) error {
 func (app *App) handleRowsRight(gui *gocui.Gui, view *gocui.View) error {
 	logEvent("rows-right")
 	return app.scrollHorizontal(1)
+}
+
+func (app *App) handlePaneLeft(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("pane-left")
+	if app.focusArea == focusSidebar {
+		return nil
+	}
+
+	err := app.setFocus(focusSidebar)
+	if err != nil {
+		return err
+	}
+
+	return app.render()
+}
+
+func (app *App) handlePaneRight(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("pane-right")
+	if app.focusArea == focusRows {
+		return nil
+	}
+
+	err := app.setFocus(focusRows)
+	if err != nil {
+		return err
+	}
+
+	return app.render()
+}
+
+func (app *App) handlePaneDown(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("pane-down")
+	if app.focusArea == focusQuery {
+		return nil
+	}
+
+	err := app.setFocus(focusQuery)
+	if err != nil {
+		return err
+	}
+
+	return app.render()
+}
+
+func (app *App) handlePaneUp(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("pane-up")
+	if app.focusArea != focusQuery {
+		return nil
+	}
+
+	err := app.setFocus(focusRows)
+	if err != nil {
+		return err
+	}
+
+	return app.render()
 }
 
 func (app *App) handleQuerySubmit(gui *gocui.Gui, view *gocui.View) error {

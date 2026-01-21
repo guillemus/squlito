@@ -26,6 +26,8 @@ type App struct {
 	scrollState   ScrollState
 	scrollX       int
 	sidebarScroll int
+
+	initialFocusApplied bool
 }
 
 func Run(dbPath string) error {
@@ -100,6 +102,7 @@ func NewApp(dbPath string, gui *gocui.Gui) *App {
 		},
 		scrollX:       0,
 		sidebarScroll: 0,
+		initialFocusApplied: false,
 	}
 }
 
@@ -152,6 +155,14 @@ func (app *App) layout(gui *gocui.Gui) error {
 	err := app.layoutViews(gui, metrics, maxX, maxY)
 	if err != nil {
 		return err
+	}
+
+	if !app.initialFocusApplied {
+		err = app.setFocus(focusSidebar)
+		if err != nil {
+			return err
+		}
+		app.initialFocusApplied = true
 	}
 
 	return app.render()

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/awesome-gocui/gocui"
+
 	"squlito/internal/tableformat"
 )
 
@@ -29,6 +31,8 @@ func (app *App) render() error {
 	if queryView != nil {
 		QueryPanel(app, queryView)
 	}
+
+	app.applyFocusStyles(sidebarView, rowsHeaderView, rowsBodyView, queryView)
 
 	Sidebar(app, sidebarView)
 
@@ -78,6 +82,31 @@ func (app *App) render() error {
 	StatusBar(app, statusView)
 
 	return nil
+}
+
+func (app *App) applyFocusStyles(sidebarView *gocui.View, rowsHeaderView *gocui.View, rowsBodyView *gocui.View, queryView *gocui.View) {
+	focusColor := gocui.ColorGreen
+	defaultColor := gocui.ColorDefault
+
+	setViewFocusStyle(sidebarView, app.focusArea == focusSidebar, focusColor, defaultColor)
+	setViewFocusStyle(rowsHeaderView, app.focusArea == focusRows, focusColor, defaultColor)
+	setViewFocusStyle(rowsBodyView, app.focusArea == focusRows, focusColor, defaultColor)
+	setViewFocusStyle(queryView, app.focusArea == focusQuery, focusColor, defaultColor)
+}
+
+func setViewFocusStyle(view *gocui.View, focused bool, focusColor gocui.Attribute, defaultColor gocui.Attribute) {
+	if view == nil {
+		return
+	}
+
+	if focused {
+		view.FrameColor = focusColor
+		view.TitleColor = focusColor
+		return
+	}
+
+	view.FrameColor = defaultColor
+	view.TitleColor = defaultColor
 }
 
 func (app *App) buildTableView() (tableformat.TableRender, bool) {
