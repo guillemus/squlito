@@ -32,6 +32,11 @@ func (app *App) render() error {
 		QueryPanel(app, queryView)
 	}
 
+	modalBackdropView, _ := app.gui.View(modalBackdropViewName)
+	if modalBackdropView != nil && app.modalOpen {
+		ModalBackdrop(modalBackdropView)
+	}
+
 	modalView, _ := app.gui.View(modalViewName)
 	if modalView != nil && app.modalOpen {
 		Modal(app, modalView)

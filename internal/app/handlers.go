@@ -15,9 +15,9 @@ func (app *App) bindKeys() error {
     if err := gui.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, app.quit); err != nil {
         return err
     }
-    if err := gui.SetKeybinding("", gocui.KeyEsc, gocui.ModNone, app.quit); err != nil {
-        return err
-    }
+	if err := gui.SetKeybinding("", gocui.KeyEsc, gocui.ModNone, app.handleGlobalEsc); err != nil {
+		return err
+	}
     if err := gui.SetKeybinding("", 'q', gocui.ModNone, app.quit); err != nil {
         return err
     }
@@ -256,6 +256,15 @@ func (app *App) handlePaneLeft(gui *gocui.Gui, view *gocui.View) error {
 	}
 
 	return app.render()
+}
+
+func (app *App) handleGlobalEsc(gui *gocui.Gui, view *gocui.View) error {
+	logEvent("esc")
+	if app.modalOpen {
+		return app.handleModalClose(gui, view)
+	}
+
+	return app.quit(gui, view)
 }
 
 func (app *App) handlePaneRight(gui *gocui.Gui, view *gocui.View) error {

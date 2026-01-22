@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/awesome-gocui/gocui"
 
@@ -97,4 +98,24 @@ func Modal(app *App, view *gocui.View) {
 
 	_ = view.SetOrigin(0, app.modalScroll)
 	_, _ = fmt.Fprint(view, app.modalBody)
+}
+
+func ModalBackdrop(view *gocui.View) {
+	if view == nil {
+		return
+	}
+
+	view.Clear()
+	width, height := view.Size()
+	if width < 1 || height < 1 {
+		return
+	}
+
+	line := strings.Repeat(" ", width)
+	for row := 0; row < height; row += 1 {
+		_, _ = fmt.Fprint(view, line)
+		if row < height-1 {
+			_, _ = fmt.Fprint(view, "\n")
+		}
+	}
 }
