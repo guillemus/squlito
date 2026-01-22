@@ -2,6 +2,26 @@
 
 Terminal SQLite browser built with Go + gocui.
 
+## Install
+
+### macOS/Linux (script)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/guillemus/squlito/main/install.sh | sh
+```
+
+Note: Windows install script not supported yet.
+
+Optional:
+
+```bash
+VERSION=v0.1.0 PREFIX=$HOME/.local curl -fsSL https://raw.githubusercontent.com/guillemus/squlito/main/install.sh | sh
+```
+
+### Manual
+
+Download the archive from the GitHub Releases page and place `squlito` in your PATH.
+
 ## Seed data
 
 ```bash
