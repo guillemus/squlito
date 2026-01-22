@@ -36,25 +36,6 @@ type QueryRowsResult struct {
 	Truncated bool
 }
 
-func ParseDatabasePathFromArgs(args []string) string {
-	path := "data/seed.db"
-
-	for _, arg := range args {
-		if arg == "--" {
-			continue
-		}
-
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-
-		path = arg
-		break
-	}
-
-	return path
-}
-
 func OpenDatabase(dbPath string) (*sql.DB, error) {
 	dsn := makeReadonlyDsn(dbPath)
 	db, err := sql.Open("sqlite", dsn)

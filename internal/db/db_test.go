@@ -24,41 +24,6 @@ func createTestDb(t *testing.T) *sql.DB {
 	return db
 }
 
-func TestParseDatabasePathFromArgs_Default(t *testing.T) {
-	path := ParseDatabasePathFromArgs([]string{})
-	if path != "data/seed.db" {
-		t.Fatalf("expected default path, got %q", path)
-	}
-}
-
-func TestParseDatabasePathFromArgs_Positional(t *testing.T) {
-	path := ParseDatabasePathFromArgs([]string{"example.db"})
-	if path != "example.db" {
-		t.Fatalf("expected positional path, got %q", path)
-	}
-}
-
-func TestParseDatabasePathFromArgs_SkipsFlags(t *testing.T) {
-	path := ParseDatabasePathFromArgs([]string{"--verbose", "file.db"})
-	if path != "file.db" {
-		t.Fatalf("expected file.db, got %q", path)
-	}
-}
-
-func TestParseDatabasePathFromArgs_IgnoresAfterFirst(t *testing.T) {
-	path := ParseDatabasePathFromArgs([]string{"first.db", "second.db"})
-	if path != "first.db" {
-		t.Fatalf("expected first.db, got %q", path)
-	}
-}
-
-func TestParseDatabasePathFromArgs_SkipsSeparator(t *testing.T) {
-	path := ParseDatabasePathFromArgs([]string{"--", "db.sqlite"})
-	if path != "db.sqlite" {
-		t.Fatalf("expected db.sqlite, got %q", path)
-	}
-}
-
 func TestListUserTables(t *testing.T) {
 	db := createTestDb(t)
 	defer func() {
