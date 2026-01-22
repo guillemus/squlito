@@ -305,7 +305,7 @@ func (app *App) buildStatusRight() string {
 	}
 
 	if app.focusArea == focusQuery {
-		return "Enter run  Shift+Enter newline  Tab tables  q quit"
+		return "Enter run  Shift+Enter newline  Up/Down history  Tab tables  q quit"
 	}
 
 	if app.focusArea == focusModal {

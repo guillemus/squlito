@@ -10,9 +10,10 @@ import (
 )
 
 type App struct {
-	dbPath string
-	db     *sql.DB
-	gui    *gocui.Gui
+	dbPath    string
+	db        *sql.DB
+	gui       *gocui.Gui
+	historyDB *sql.DB
 
 	focusArea FocusArea
 	viewMode  ViewMode
@@ -20,8 +21,11 @@ type App struct {
 	tables             []db.SqliteTable
 	selectedTableIndex int
 
-	tableState TableState
-	queryState QueryState
+	tableState     TableState
+	queryState     QueryState
+	historyEntries []QueryHistoryEntry
+	historyIndex   int
+	historyDraft   string
 
 	scrollState   ScrollState
 	scrollX       int
@@ -76,6 +80,7 @@ func NewApp(dbPath string, gui *gocui.Gui) *App {
 		dbPath:             dbPath,
 		db:                 nil,
 		gui:                gui,
+		historyDB:          nil,
 		focusArea:          focusSidebar,
 		viewMode:           viewTable,
 		tables:             nil,
@@ -99,6 +104,9 @@ func NewApp(dbPath string, gui *gocui.Gui) *App {
 			Truncated: false,
 			Offset:    0,
 		},
+		historyEntries: nil,
+		historyIndex:   -1,
+		historyDraft:   "",
 		scrollState: ScrollState{
 			OverflowY:         false,
 			OverflowX:         false,
@@ -106,14 +114,14 @@ func NewApp(dbPath string, gui *gocui.Gui) *App {
 			ViewportWidth:     0,
 			TableContentWidth: 0,
 		},
-		scrollX:       0,
-		sidebarScroll: 0,
+		scrollX:             0,
+		sidebarScroll:       0,
 		initialFocusApplied: false,
-		modalOpen:      false,
-		modalTitle:     "",
-		modalBody:      "",
-		modalScroll:    0,
-		modalPrevFocus: focusSidebar,
+		modalOpen:           false,
+		modalTitle:          "",
+		modalBody:           "",
+		modalScroll:         0,
+		modalPrevFocus:      focusSidebar,
 	}
 }
 
@@ -125,6 +133,7 @@ func (app *App) Init() error {
 	}
 
 	app.db = dbConn
+	app.initHistory()
 
 	tables, err := db.ListUserTables(app.db)
 	if err != nil {
@@ -146,13 +155,18 @@ func (app *App) Init() error {
 }
 
 func (app *App) Close() {
-	if app.db == nil {
-		return
+	if app.db != nil {
+		err := app.db.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
-	err := app.db.Close()
-	if err != nil {
-		fmt.Println(err)
+	if app.historyDB != nil {
+		err := app.historyDB.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 
@@ -246,7 +260,7 @@ func (app *App) layoutViews(gui *gocui.Gui, metrics layoutMetrics, maxX int, max
 		queryView.Title = "Query"
 		queryView.Wrap = true
 		queryView.Editable = true
-		queryView.Editor = loggingEditor{next: gocui.DefaultEditor}
+		queryView.Editor = loggingEditor{next: gocui.DefaultEditor, app: app}
 	}
 
 	statusView, err := gui.SetView("status", 0, statusY0, maxX-1, statusY1, 0)
