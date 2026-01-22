@@ -32,17 +32,13 @@ func (app *App) render() error {
 		QueryPanel(app, queryView)
 	}
 
-	modalBackdropView, _ := app.gui.View(modalBackdropViewName)
-	if modalBackdropView != nil && app.modalOpen {
-		ModalBackdrop(modalBackdropView)
-	}
-
 	modalView, _ := app.gui.View(modalViewName)
 	if modalView != nil && app.modalOpen {
 		Modal(app, modalView)
 	}
 
 	app.applyFocusStyles(sidebarView, rowsHeaderView, rowsBodyView, queryView, modalView)
+	app.applyModalDimStyles(sidebarView, rowsHeaderView, rowsBodyView, queryView, statusView)
 
 	Sidebar(app, sidebarView)
 
@@ -105,6 +101,24 @@ func (app *App) applyFocusStyles(sidebarView *gocui.View, rowsHeaderView *gocui.
 	setViewFocusStyle(modalView, app.focusArea == focusModal, focusColor, defaultColor)
 }
 
+func (app *App) applyModalDimStyles(sidebarView *gocui.View, rowsHeaderView *gocui.View, rowsBodyView *gocui.View, queryView *gocui.View, statusView *gocui.View) {
+	if app.modalOpen {
+		dimColor := gocui.ColorDefault | gocui.AttrDim
+		setViewDimStyle(sidebarView, dimColor)
+		setViewDimStyle(rowsHeaderView, dimColor)
+		setViewDimStyle(rowsBodyView, dimColor)
+		setViewDimStyle(queryView, dimColor)
+		setViewDimStyle(statusView, dimColor)
+		return
+	}
+
+	resetViewDimStyle(sidebarView)
+	resetViewDimStyle(rowsHeaderView)
+	resetViewDimStyle(rowsBodyView)
+	resetViewDimStyle(queryView)
+	resetViewDimStyle(statusView)
+}
+
 func setViewFocusStyle(view *gocui.View, focused bool, focusColor gocui.Attribute, defaultColor gocui.Attribute) {
 	if view == nil {
 		return
@@ -118,6 +132,26 @@ func setViewFocusStyle(view *gocui.View, focused bool, focusColor gocui.Attribut
 
 	view.FrameColor = defaultColor
 	view.TitleColor = defaultColor
+}
+
+func setViewDimStyle(view *gocui.View, dimColor gocui.Attribute) {
+	if view == nil {
+		return
+	}
+
+	view.FgColor = dimColor
+	view.BgColor = dimColor
+	view.FrameColor = dimColor
+	view.TitleColor = dimColor
+}
+
+func resetViewDimStyle(view *gocui.View) {
+	if view == nil {
+		return
+	}
+
+	view.FgColor = gocui.ColorDefault
+	view.BgColor = gocui.ColorDefault
 }
 
 func (app *App) buildTableView() (tableformat.TableRender, bool) {

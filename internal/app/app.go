@@ -191,11 +191,6 @@ func (app *App) layout(gui *gocui.Gui) error {
 	}
 
 	if app.modalOpen {
-		err = app.layoutModalBackdrop(gui, maxX, maxY)
-		if err != nil {
-			return err
-		}
-
 		err = app.layoutModal(gui, maxX, maxY)
 		if err != nil {
 			return err

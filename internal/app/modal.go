@@ -12,8 +12,6 @@ import (
 
 const modalViewName = "modal"
 
-const modalBackdropViewName = "modalBackdrop"
-
 func (app *App) layoutModal(gui *gocui.Gui, maxX int, maxY int) error {
 	width := int(float64(maxX) * 0.7)
 	height := int(float64(maxY) * 0.6)
@@ -55,26 +53,6 @@ func (app *App) layoutModal(gui *gocui.Gui, maxX int, maxY int) error {
 	return nil
 }
 
-func (app *App) layoutModalBackdrop(gui *gocui.Gui, maxX int, maxY int) error {
-	if maxX < 2 || maxY < 2 {
-		return nil
-	}
-
-	view, err := gui.SetView(modalBackdropViewName, 0, 0, maxX-1, maxY-1, 0)
-	if err != nil && err != gocui.ErrUnknownView {
-		return err
-	}
-	if err == gocui.ErrUnknownView {
-		view.Frame = false
-		view.Wrap = false
-		view.BgColor = gocui.ColorBlack
-		view.FgColor = gocui.ColorBlack
-	}
-
-	_, _ = gui.SetViewOnTop(modalBackdropViewName)
-	return nil
-}
-
 func (app *App) clearModal(gui *gocui.Gui) {
 	if gui == nil {
 		return
@@ -82,25 +60,10 @@ func (app *App) clearModal(gui *gocui.Gui) {
 
 	_, err := gui.View(modalViewName)
 	if err != nil {
-		app.clearModalBackdrop(gui)
 		return
 	}
 
 	_ = gui.DeleteView(modalViewName)
-	app.clearModalBackdrop(gui)
-}
-
-func (app *App) clearModalBackdrop(gui *gocui.Gui) {
-	if gui == nil {
-		return
-	}
-
-	_, err := gui.View(modalBackdropViewName)
-	if err != nil {
-		return
-	}
-
-	_ = gui.DeleteView(modalBackdropViewName)
 }
 
 func (app *App) openModal(title string, body string) error {
