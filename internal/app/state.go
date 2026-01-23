@@ -94,22 +94,6 @@ func clampInt(value int, min int, max int) int {
 	return value
 }
 
-func maxInt(a int, b int) int {
-	if a > b {
-		return a
-	}
-
-	return b
-}
-
-func minInt(a int, b int) int {
-	if a < b {
-		return a
-	}
-
-	return b
-}
-
 func truncateTitle(value string) string {
 	trimmed := strings.ReplaceAll(value, "\n", " ")
 	trimmed = strings.TrimSpace(trimmed)
@@ -121,7 +105,7 @@ func truncateTitle(value string) string {
 		return trimmed
 	}
 
-	safeMax := maxInt(0, titleMaxChars-3)
+	safeMax := max(0, titleMaxChars-3)
 	return trimmed[:safeMax] + "..."
 }
 

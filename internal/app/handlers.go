@@ -1,9 +1,7 @@
 package app
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
+	"log/slog"
 	"time"
 
 	"github.com/awesome-gocui/gocui"
@@ -454,53 +452,25 @@ func (app *App) scrollHorizontal(delta int) error {
 		return nil
 	}
 
-	step := maxInt(1, app.scrollState.ViewportWidth/scrollStepDivisor)
+	step := max(1, app.scrollState.ViewportWidth/scrollStepDivisor)
 	app.scrollX += delta * step
 	return app.render()
 }
 
 func appendLatencyLog(start time.Time, duration time.Duration) {
-	file, err := openLogFile()
-	if err != nil {
-		return
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-
-	_, _ = fmt.Fprintf(file, "%s shift-enter %s\n", start.Format(time.RFC3339Nano), duration)
+	Logger().Info("latency", slog.String("action", "shift-enter"), slog.Time("started_at", start), slog.Duration("duration", duration))
 }
 
 func logEvent(name string) {
-	file, err := openLogFile()
-	if err != nil {
-		return
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-
-	_, _ = fmt.Fprintf(file, "%s event %s\n", time.Now().Format(time.RFC3339Nano), name)
+	Logger().Info("event", slog.String("name", name))
 }
 
 func logKeyEvent(source string, key gocui.Key, ch rune, mod gocui.Modifier) {
-	file, err := openLogFile()
-	if err != nil {
-		return
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-
-	_, _ = fmt.Fprintf(file, "%s key %s key=%d ch=%d mod=%d\n", time.Now().Format(time.RFC3339Nano), source, key, ch, mod)
-}
-
-func openLogFile() (*os.File, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return os.OpenFile("debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	}
-
-	path := filepath.Join(cwd, "debug.log")
-	return os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	Logger().Debug(
+		"key",
+		slog.String("source", source),
+		slog.Int("key", int(key)),
+		slog.Int("ch", int(ch)),
+		slog.Int("mod", int(mod)),
+	)
 }

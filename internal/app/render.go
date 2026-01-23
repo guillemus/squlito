@@ -78,7 +78,7 @@ func (app *App) render() error {
 		app.scrollX = 0
 	}
 
-	maxScrollX := maxInt(0, contentWidth-viewportWidth)
+	maxScrollX := max(0, contentWidth-viewportWidth)
 	app.scrollX = clampInt(app.scrollX, 0, maxScrollX)
 
 	rowsHeaderView.Title = app.getRowsTitle()
@@ -229,7 +229,7 @@ func (app *App) currentOffset() int {
 
 func (app *App) syncOffsets(viewRowCount int, viewportRows int) {
 	if app.viewMode == viewQuery {
-		maxOffset := maxInt(0, viewRowCount-viewportRows)
+		maxOffset := max(0, viewRowCount-viewportRows)
 		app.queryState.Offset = clampInt(app.queryState.Offset, 0, maxOffset)
 		return
 	}
@@ -240,7 +240,7 @@ func (app *App) syncOffsets(viewRowCount int, viewportRows int) {
 		return
 	}
 
-	maxOffset := maxInt(0, app.tableState.TotalRows-viewportRows)
+	maxOffset := max(0, app.tableState.TotalRows-viewportRows)
 	nextOffset := clampInt(app.tableState.Offset, 0, maxOffset)
 	nextBufferStart := app.tableState.BufferStart
 	bufferEnd := nextBufferStart + app.tableState.BufferSize
@@ -254,7 +254,7 @@ func (app *App) syncOffsets(viewRowCount int, viewportRows int) {
 	}
 
 	if nextOffset >= bufferEnd {
-		nextBufferStart = maxInt(0, nextOffset-app.tableState.BufferSize+1)
+		nextBufferStart = max(0, nextOffset-app.tableState.BufferSize+1)
 	}
 
 	app.tableState.Offset = nextOffset
@@ -358,7 +358,7 @@ func (app *App) currentRowRange() (int, int) {
 	showStart := viewOffset + 1
 	showEnd := viewOffset + viewportRows
 	if viewRowCount > 0 {
-		showEnd = minInt(viewRowCount, showEnd)
+		showEnd = min(viewRowCount, showEnd)
 	}
 
 	return showStart, showEnd
