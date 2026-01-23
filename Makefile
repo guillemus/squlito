@@ -9,6 +9,9 @@ install:
 run:
 	go run cmd/squlito/main.go data/seed.db
 
+lint:
+	golangci-lint run ./...
+
 seed:
 	go run cmd/seed/main.go
 

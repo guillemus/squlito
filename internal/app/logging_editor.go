@@ -16,12 +16,12 @@ func (editor loggingEditor) Edit(view *gocui.View, key gocui.Key, ch rune, mod g
 	if editor.app == nil {
 		return
 	}
-	if isQueryEditKey(key, ch, mod) {
+	if isQueryEditKey(key, ch) {
 		editor.app.resetHistorySelection()
 	}
 }
 
-func isQueryEditKey(key gocui.Key, ch rune, mod gocui.Modifier) bool {
+func isQueryEditKey(key gocui.Key, ch rune) bool {
 	if ch != 0 {
 		return true
 	}

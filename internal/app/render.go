@@ -91,24 +91,20 @@ func (app *App) render() error {
 }
 
 func (app *App) applyFocusStyles(sidebarView *gocui.View, rowsHeaderView *gocui.View, rowsBodyView *gocui.View, queryView *gocui.View, modalView *gocui.View) {
-	focusColor := gocui.ColorGreen
-	defaultColor := gocui.ColorDefault
-
-	setViewFocusStyle(sidebarView, app.focusArea == focusSidebar, focusColor, defaultColor)
-	setViewFocusStyle(rowsHeaderView, app.focusArea == focusRows, focusColor, defaultColor)
-	setViewFocusStyle(rowsBodyView, app.focusArea == focusRows, focusColor, defaultColor)
-	setViewFocusStyle(queryView, app.focusArea == focusQuery, focusColor, defaultColor)
-	setViewFocusStyle(modalView, app.focusArea == focusModal, focusColor, defaultColor)
+	setViewFocusStyle(sidebarView, app.focusArea == focusSidebar)
+	setViewFocusStyle(rowsHeaderView, app.focusArea == focusRows)
+	setViewFocusStyle(rowsBodyView, app.focusArea == focusRows)
+	setViewFocusStyle(queryView, app.focusArea == focusQuery)
+	setViewFocusStyle(modalView, app.focusArea == focusModal)
 }
 
 func (app *App) applyModalDimStyles(sidebarView *gocui.View, rowsHeaderView *gocui.View, rowsBodyView *gocui.View, queryView *gocui.View, statusView *gocui.View) {
 	if app.modalOpen {
-		dimColor := gocui.ColorDefault | gocui.AttrDim
-		setViewDimStyle(sidebarView, dimColor)
-		setViewDimStyle(rowsHeaderView, dimColor)
-		setViewDimStyle(rowsBodyView, dimColor)
-		setViewDimStyle(queryView, dimColor)
-		setViewDimStyle(statusView, dimColor)
+		setViewDimStyle(sidebarView)
+		setViewDimStyle(rowsHeaderView)
+		setViewDimStyle(rowsBodyView)
+		setViewDimStyle(queryView)
+		setViewDimStyle(statusView)
 		return
 	}
 
@@ -119,26 +115,27 @@ func (app *App) applyModalDimStyles(sidebarView *gocui.View, rowsHeaderView *goc
 	resetViewDimStyle(statusView)
 }
 
-func setViewFocusStyle(view *gocui.View, focused bool, focusColor gocui.Attribute, defaultColor gocui.Attribute) {
+func setViewFocusStyle(view *gocui.View, focused bool) {
 	if view == nil {
 		return
 	}
 
 	if focused {
-		view.FrameColor = focusColor
-		view.TitleColor = focusColor
+		view.FrameColor = gocui.ColorGreen
+		view.TitleColor = gocui.ColorGreen
 		return
 	}
 
-	view.FrameColor = defaultColor
-	view.TitleColor = defaultColor
+	view.FrameColor = gocui.ColorDefault
+	view.TitleColor = gocui.ColorDefault
 }
 
-func setViewDimStyle(view *gocui.View, dimColor gocui.Attribute) {
+func setViewDimStyle(view *gocui.View) {
 	if view == nil {
 		return
 	}
 
+	dimColor := gocui.ColorDefault | gocui.AttrDim
 	view.FgColor = dimColor
 	view.BgColor = dimColor
 	view.FrameColor = dimColor
